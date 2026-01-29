@@ -10,6 +10,7 @@ import {
   parseResourceUri,
   createResourceUri,
   createUriVariants,
+  transformResourceLinksInResult,
 } from "@/main/utils/uri-utils";
 import { MCPServerManager } from "../mcp-server-manager/mcp-server-manager";
 import { ToolCatalogService } from "@/main/modules/tool-catalog/tool-catalog.service";
@@ -750,17 +751,19 @@ export class RequestHandlers extends RequestHandlerBase {
       serverName,
       "CallTool",
       async () => {
-        return await client.callTool(
+        const result = await client.callTool(
           {
             name: originalToolName,
             arguments: request.params.arguments || {},
           },
           undefined,
           {
-            timeout: 60 * 60 * 1000, // 60分
+            timeout: 60 * 60 * 1000, // 60 minutes
             resetTimeoutOnProgress: true,
           },
         );
+        // Transform resource links to use router's namespace
+        return transformResourceLinksInResult(result, serverName);
       },
       { serverId },
     );

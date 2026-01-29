@@ -11,6 +11,7 @@ import { TokenValidator } from "@/main/modules/mcp-server-runtime/token-validato
 import { RequestHandlerBase } from "@/main/modules/mcp-server-runtime/request-handler-base";
 import { getProjectService } from "@/main/modules/projects/projects.service";
 import { ToolCatalogService } from "./tool-catalog.service";
+import { transformResourceLinksInResult } from "@/main/utils/uri-utils";
 
 interface ToolKeyEntry {
   serverId: string;
@@ -331,7 +332,7 @@ export class ToolCatalogHandler extends RequestHandlerBase {
       serverName,
       "ToolExecute",
       async () => {
-        return await client.callTool(
+        const result = await client.callTool(
           {
             name: toolName,
             arguments: toolArguments,
@@ -342,6 +343,8 @@ export class ToolCatalogHandler extends RequestHandlerBase {
             resetTimeoutOnProgress: true,
           },
         );
+        // Transform resource links to use router's namespace
+        return transformResourceLinksInResult(result, serverName);
       },
       { serverId },
     );

@@ -57,3 +57,4 @@ export * from "./cli";
 export * from "./workflow-types";
 export * from "./shared-config";
 export * from "./skill-types";
+export * from "./elicitation-types";

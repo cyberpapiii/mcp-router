@@ -25,6 +25,12 @@ export class TokenManager {
       McpAppsManagerRepository.getInstance().deleteClientTokens(clientId);
     }
 
+    // Set default expiration to 24 hours if not specified
+    const defaultExpirationSeconds = 24 * 60 * 60;
+    const expiresAt = options.expiresIn
+      ? now + options.expiresIn
+      : now + defaultExpirationSeconds;
+
     // より強固なランダム値を生成（24バイト = 192ビット）
     const randomBytes = crypto
       .randomBytes(24)
@@ -38,6 +44,7 @@ export class TokenManager {
       clientId,
       issuedAt: now,
       serverAccess: options.serverAccess || {},
+      expiresAt,
     };
 
     // トークンを永続化
@@ -46,7 +53,7 @@ export class TokenManager {
   }
 
   /**
-   * トークンを検証
+   * Validate token including expiration check
    */
   public validateToken(tokenId: string): TokenValidationResult {
     const token = McpAppsManagerRepository.getInstance().getToken(tokenId);
@@ -56,6 +63,17 @@ export class TokenManager {
         isValid: false,
         error: "Token not found",
       };
+    }
+
+    // Check expiration if set
+    if (token.expiresAt) {
+      const now = Math.floor(Date.now() / 1000);
+      if (now > token.expiresAt) {
+        return {
+          isValid: false,
+          error: "Token has expired",
+        };
+      }
     }
 
     return {

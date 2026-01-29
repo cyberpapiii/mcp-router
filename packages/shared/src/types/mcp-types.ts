@@ -41,6 +41,27 @@ export interface MCPTool {
   description?: string;
   enabled?: boolean;
   inputSchema?: any;
+  /** Output schema for structured tool results (MCP 2025-06-18) */
+  outputSchema?: any;
+  /** Behavioral hints for clients (MCP 2025-06-18) */
+  annotations?: MCPToolAnnotations;
+}
+
+/**
+ * Tool annotations for behavioral hints (MCP 2025-06-18 spec)
+ * These are HINTS only - never rely on them for security decisions
+ */
+export interface MCPToolAnnotations {
+  /** Human-readable title for UI display */
+  title?: string;
+  /** Tool does not modify environment (default: false) */
+  readOnlyHint?: boolean;
+  /** Tool may perform destructive updates (default: true when readOnlyHint=false) */
+  destructiveHint?: boolean;
+  /** Repeated calls with same args have no additional effect (default: false) */
+  idempotentHint?: boolean;
+  /** Tool interacts with external entities (default: true) */
+  openWorldHint?: boolean;
 }
 
 export interface MCPServerToolPermissions {

@@ -22,6 +22,8 @@ import {
   META_TOOLS,
 } from "@/main/modules/tool-catalog/tool-catalog-handler";
 import { getSharedConfigManager } from "@/main/infrastructure/shared-config-manager";
+import { getElicitationManager } from "./elicitation-manager";
+import { validateElicitationUrl } from "@/main/utils/url-validation-utils";
 
 /**
  * Handles all request processing for the aggregator server
@@ -771,5 +773,73 @@ export class RequestHandlers extends RequestHandlerBase {
 
   public getServerIdByName(name: string): string | undefined {
     return this.serverNameToIdMap.get(name);
+  }
+
+  /**
+   * Handle elicitation/create request (passthrough to client)
+   * Routes elicitation requests from backend servers to the connected client
+   */
+  public async handleElicitationCreate(
+    request: any,
+    backendServerId: string,
+  ): Promise<any> {
+    const elicitationId = request.params?.elicitationId;
+    const mode = request.params?.mode;
+    const message = request.params?.message;
+
+    if (!elicitationId || !mode) {
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        "elicitationId and mode are required",
+      );
+    }
+
+    // For URL mode, validate the URL for security
+    if (mode === "url") {
+      const url = request.params?.url;
+      if (!url) {
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          "URL is required for url mode",
+        );
+      }
+
+      const validation = validateElicitationUrl(url);
+      if (!validation.isValid) {
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `Invalid elicitation URL: ${validation.error}`,
+        );
+      }
+    }
+
+    // Track the elicitation for notification routing
+    const clientSessionId = request.params?._meta?.sessionId || "default";
+    getElicitationManager().createElicitation(
+      elicitationId,
+      clientSessionId,
+      backendServerId,
+      mode,
+    );
+
+    // Forward to client (the aggregator server will handle this)
+    // Return the request for the aggregator to forward
+    return {
+      method: "elicitation/create",
+      params: {
+        elicitationId,
+        mode,
+        message,
+        ...(mode === "form" && { schema: request.params.schema }),
+        ...(mode === "url" && { url: request.params.url }),
+      },
+    };
+  }
+
+  /**
+   * Handle elicitation completion notification from client
+   */
+  public handleElicitationComplete(elicitationId: string): void {
+    getElicitationManager().completeElicitation(elicitationId);
   }
 }

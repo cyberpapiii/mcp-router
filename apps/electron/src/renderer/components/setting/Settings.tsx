@@ -23,7 +23,54 @@ import {
 } from "@tabler/icons-react";
 import { electronPlatformAPI as platformAPI } from "../../platform-api/electron-platform-api";
 import { postHogService } from "../../services/posthog-service";
-import type { CloudSyncStatus } from "@mcp_router/shared";
+import type { CloudSyncStatus, AppSettings } from "@mcp_router/shared";
+
+/**
+ * Boolean設定のトグルハンドラーを生成するヘルパー関数
+ * Optimistic update、保存、エラー時のロールバック、ローディング状態を管理
+ */
+type BooleanSettingKey = {
+  [K in keyof AppSettings]: AppSettings[K] extends boolean | undefined
+    ? K
+    : never;
+}[keyof AppSettings];
+
+interface CreateBooleanSettingToggleOptions {
+  /** 設定キー */
+  settingKey: BooleanSettingKey;
+  /** ローカルステートのセッター */
+  stateSetter: React.Dispatch<React.SetStateAction<boolean>>;
+  /** ローディング状態のセッター */
+  setLoading: React.Dispatch<React.SetStateAction<boolean>>;
+  /** 保存成功後に実行する追加処理 */
+  onSuccess?: (checked: boolean, currentSettings: AppSettings) => void;
+}
+
+const createBooleanSettingToggle = ({
+  settingKey,
+  stateSetter,
+  setLoading,
+  onSuccess,
+}: CreateBooleanSettingToggleOptions) => {
+  return async (checked: boolean) => {
+    stateSetter(checked);
+    setLoading(true);
+    try {
+      const currentSettings = await platformAPI.settings.get();
+      const updatedSettings: AppSettings = {
+        ...currentSettings,
+        [settingKey as string]: checked,
+      };
+      await platformAPI.settings.save(updatedSettings);
+      onSuccess?.(checked, currentSettings);
+    } catch (error) {
+      console.error(`Failed to save ${settingKey} settings:`, error);
+      stateSetter(!checked);
+    } finally {
+      setLoading(false);
+    }
+  };
+};
 
 const Settings: React.FC = () => {
   const { t, i18n } = useTranslation();
@@ -157,99 +204,42 @@ const Settings: React.FC = () => {
     }
   };
 
-  // Handle external MCP configs toggle
-  const handleExternalMCPConfigsToggle = async (checked: boolean) => {
-    setLoadExternalMCPConfigs(checked);
-    setIsSavingSettings(true);
-    try {
-      const currentSettings = await platformAPI.settings.get();
-      await platformAPI.settings.save({
-        ...currentSettings,
-        loadExternalMCPConfigs: checked,
-      });
-    } catch (error) {
-      console.error("Failed to save settings:", error);
-      setLoadExternalMCPConfigs(!checked);
-    } finally {
-      setIsSavingSettings(false);
-    }
-  };
+  // Boolean setting toggle handlers using generic helper
+  const handleExternalMCPConfigsToggle = createBooleanSettingToggle({
+    settingKey: "loadExternalMCPConfigs",
+    stateSetter: setLoadExternalMCPConfigs,
+    setLoading: setIsSavingSettings,
+  });
 
-  // Handle analytics toggle
-  const handleAnalyticsToggle = async (checked: boolean) => {
-    setAnalyticsEnabled(checked);
-    setIsSavingSettings(true);
-    try {
-      const currentSettings = await platformAPI.settings.get();
-      await platformAPI.settings.save({
-        ...currentSettings,
-        analyticsEnabled: checked,
-      });
+  const handleAnalyticsToggle = createBooleanSettingToggle({
+    settingKey: "analyticsEnabled",
+    stateSetter: setAnalyticsEnabled,
+    setLoading: setIsSavingSettings,
+    onSuccess: (checked, currentSettings) => {
       postHogService.updateConfig({
         analyticsEnabled: checked,
         userId: currentSettings.userId,
       });
-    } catch (error) {
-      console.error("Failed to save analytics settings:", error);
-      setAnalyticsEnabled(!checked);
-    } finally {
-      setIsSavingSettings(false);
-    }
-  };
+    },
+  });
 
-  // Handle auto update toggle
-  const handleAutoUpdateToggle = async (checked: boolean) => {
-    setAutoUpdateEnabled(checked);
-    setIsSavingSettings(true);
-    try {
-      const currentSettings = await platformAPI.settings.get();
-      await platformAPI.settings.save({
-        ...currentSettings,
-        autoUpdateEnabled: checked,
-      });
-    } catch (error) {
-      console.error("Failed to save auto update settings:", error);
-      setAutoUpdateEnabled(!checked);
-    } finally {
-      setIsSavingSettings(false);
-    }
-  };
+  const handleAutoUpdateToggle = createBooleanSettingToggle({
+    settingKey: "autoUpdateEnabled",
+    stateSetter: setAutoUpdateEnabled,
+    setLoading: setIsSavingSettings,
+  });
 
-  // Handle startup visibility toggle
-  const handleStartupVisibilityToggle = async (checked: boolean) => {
-    setShowWindowOnStartup(checked);
-    setIsSavingSettings(true);
-    try {
-      const currentSettings = await platformAPI.settings.get();
-      await platformAPI.settings.save({
-        ...currentSettings,
-        showWindowOnStartup: checked,
-      });
-    } catch (error) {
-      console.error("Failed to save startup visibility settings:", error);
-      setShowWindowOnStartup(!checked);
-    } finally {
-      setIsSavingSettings(false);
-    }
-  };
+  const handleStartupVisibilityToggle = createBooleanSettingToggle({
+    settingKey: "showWindowOnStartup",
+    stateSetter: setShowWindowOnStartup,
+    setLoading: setIsSavingSettings,
+  });
 
-  // Handle prefix tool names toggle
-  const handlePrefixToolNamesToggle = async (checked: boolean) => {
-    setPrefixToolNames(checked);
-    setIsSavingSettings(true);
-    try {
-      const currentSettings = await platformAPI.settings.get();
-      await platformAPI.settings.save({
-        ...currentSettings,
-        prefixToolNames: checked,
-      });
-    } catch (error) {
-      console.error("Failed to save prefix tool names settings:", error);
-      setPrefixToolNames(!checked);
-    } finally {
-      setIsSavingSettings(false);
-    }
-  };
+  const handlePrefixToolNamesToggle = createBooleanSettingToggle({
+    settingKey: "prefixToolNames",
+    stateSetter: setPrefixToolNames,
+    setLoading: setIsSavingSettings,
+  });
 
   // Cloud Sync handlers
   const handleCloudSyncToggle = async (checked: boolean) => {

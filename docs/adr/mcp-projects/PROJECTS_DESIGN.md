@@ -117,7 +117,14 @@
 ## MCP Runtime Integration (Aggregator/HTTP)
 
 ### Tool names
-- Tool names are kept original for listing and calls (no namespacing or renaming by server name).
+- **Prefix mode (default):** Tool names are prefixed with the server name using `__` (double underscore) as delimiter.
+  - Format: `serverName__toolName` (e.g., `krisp__search_meetings`)
+  - Purpose: Disambiguate tools when multiple servers expose the same tool name.
+  - Constraint: Server names must not contain `__` to ensure unambiguous parsing.
+  - Shared utilities in `@mcp_router/shared`: `prefixToolName()`, `stripServerPrefix()`, `TOOL_DELIMITER`
+- **No-prefix mode:** Tool names are kept original (legacy behavior).
+  - CLI: use `--no-prefix` flag
+  - Electron: toggle `prefixToolNames` in Settings
 - Tool list items include `sourceServer` to indicate origin server.
 - Maintain a project‑scoped mapping of toolName → serverName internally (a `Map<string, Map<string,string>>`) to resolve the target server at call time.
 - Respect server `toolPermissions`; disabled tools are filtered/refused for list and call.

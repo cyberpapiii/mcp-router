@@ -1,6 +1,11 @@
 import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { MCPServer, UNASSIGNED_PROJECT_ID } from "@mcp_router/shared";
+import {
+  MCPServer,
+  UNASSIGNED_PROJECT_ID,
+  prefixToolName,
+  stripServerPrefix,
+} from "@mcp_router/shared";
 import {
   parseResourceUri,
   createResourceUri,
@@ -618,14 +623,14 @@ export class RequestHandlers extends RequestHandlerBase {
           boolean
         >;
 
+        const shouldPrefix = this.shouldPrefixToolNames();
         for (const tool of tools.tools) {
           if (permissions[tool.name] === false) {
             continue;
           }
 
-          // Prefix tool name with server name if setting is enabled
-          const prefixedName = this.shouldPrefixToolNames()
-            ? `${serverName}__${tool.name}`
+          const prefixedName = shouldPrefix
+            ? prefixToolName(serverName, tool.name)
             : tool.name;
 
           const toolWithSource = {
@@ -690,11 +695,7 @@ export class RequestHandlers extends RequestHandlerBase {
     }
     const serverName = mappedServerName;
 
-    // Extract original tool name by stripping the server prefix if present
-    // Tool names are prefixed as "serverName__toolName" when prefixToolNames is enabled
-    const originalToolName = toolName.includes("__")
-      ? toolName.substring(toolName.indexOf("__") + 2)
-      : toolName;
+    const originalToolName = stripServerPrefix(toolName);
 
     const clientId = this.tokenValidator.validateTokenAndAccess(
       token,

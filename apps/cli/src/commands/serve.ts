@@ -31,12 +31,14 @@ function parseArgs(args: string[]): {
   servers: ServeServerConfig[];
   verbose?: boolean;
   token?: string;
+  prefixToolNames: boolean;
 } {
   const options = {
     port: 3283,
     servers: [] as ServeServerConfig[],
     verbose: false,
     token: undefined as string | undefined,
+    prefixToolNames: true,
   };
 
   let i = 0;
@@ -49,6 +51,9 @@ function parseArgs(args: string[]): {
       i += 2;
     } else if (args[i] === "--verbose" || args[i] === "-v") {
       options.verbose = true;
+      i++;
+    } else if (args[i] === "--no-prefix") {
+      options.prefixToolNames = false;
       i++;
     } else if (args[i] === "--server" && i + 3 < args.length) {
       // --server <id> <name> <command> [args...]
@@ -95,8 +100,8 @@ function parseArgs(args: string[]): {
   if (options.servers.length === 0) {
     throw new Error(
       "No servers specified. Usage:\n" +
-        "  Single server: mcpr-cli serve [--port <port>] [--token <token>] [--verbose] <command> [args...]\n" +
-        "  Multiple servers: mcpr-cli serve [--port <port>] [--token <token>] [--verbose] --server <id> <name> <command> [args...] [--server ...]",
+        "  Single server: mcpr-cli serve [--port <port>] [--token <token>] [--verbose] [--no-prefix] <command> [args...]\n" +
+        "  Multiple servers: mcpr-cli serve [--port <port>] [--token <token>] [--verbose] [--no-prefix] --server <id> <name> <command> [args...] [--server ...]",
     );
   }
 
@@ -121,6 +126,7 @@ class StdioMcpBridgeServer {
       servers: ServeServerConfig[];
       verbose?: boolean;
       token?: string;
+      prefixToolNames: boolean;
     },
   ) {}
 
@@ -129,7 +135,9 @@ class StdioMcpBridgeServer {
    */
   async start(): Promise<void> {
     // Create the aggregator
-    this.aggregator = new MCPAggregator();
+    this.aggregator = new MCPAggregator({
+      prefixToolNames: this.options.prefixToolNames,
+    });
 
     // Create HTTP server and start listening immediately
     this.httpServer = createServer(async (req, res) => {

@@ -12,3 +12,11 @@ export interface ServeServerConfig {
   command: string;
   args: string[];
 }
+
+/**
+ * Options for MCPAggregator
+ */
+export interface MCPAggregatorOptions {
+  /** Whether to prefix tool names with the server name (default: true) */
+  prefixToolNames?: boolean;
+}

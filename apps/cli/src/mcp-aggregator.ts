@@ -11,7 +11,12 @@ import {
   GetPromptRequestSchema,
   ListPromptsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import type { ServerClient } from "@mcp_router/shared";
+import {
+  prefixToolName,
+  stripServerPrefix,
+  type ServerClient,
+  type MCPAggregatorOptions,
+} from "@mcp_router/shared";
 
 /**
  * Pure MCP Aggregator that combines capabilities from multiple MCP servers
@@ -21,8 +26,10 @@ export class MCPAggregator {
   private clients: Map<string, ServerClient> = new Map();
   private toolToServerMap: Map<string, string> = new Map();
   private resourceProtocolMap: Map<string, string> = new Map();
+  private prefixToolNames: boolean;
 
-  constructor() {
+  constructor(options: MCPAggregatorOptions = {}) {
+    this.prefixToolNames = options.prefixToolNames ?? true;
     this.server = new Server(
       {
         name: "mcp-aggregator",
@@ -157,13 +164,15 @@ export class MCPAggregator {
           // Get server name from the serverClient
           const serverName =
             this.clients.get(result.serverId)?.name || result.serverId;
-          const prefixedName = `${serverName}__${tool.name}`;
+          const toolName = this.prefixToolNames
+            ? prefixToolName(serverName, tool.name)
+            : tool.name;
 
-          // Map prefixed tool name to server
-          this.toolToServerMap.set(prefixedName, result.serverId);
+          // Map tool name to server
+          this.toolToServerMap.set(toolName, result.serverId);
           allTools.push({
             ...tool,
-            name: prefixedName,
+            name: toolName,
             sourceServer: serverName,
           });
         }
@@ -192,9 +201,9 @@ export class MCPAggregator {
       );
     }
 
-    // Extract original tool name by removing server prefix
-    const originalToolName = name.includes("__")
-      ? name.substring(name.indexOf("__") + 2)
+    // Extract original tool name by removing server prefix (if prefixing is enabled)
+    const originalToolName = this.prefixToolNames
+      ? stripServerPrefix(name)
       : name;
 
     try {

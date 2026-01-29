@@ -1,7 +1,7 @@
 /**
  * Manages elicitation state for proxy passthrough
  */
-import type { ElicitationState, ElicitationMode } from '@mcp_router/shared';
+import type { ElicitationState, ElicitationMode } from "@mcp_router/shared";
 
 const ELICITATION_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
@@ -25,7 +25,7 @@ export class ElicitationManager {
       backendServerId,
       mode,
       createdAt: Date.now(),
-      status: 'pending',
+      status: "pending",
     };
 
     this.states.set(elicitationId, state);
@@ -41,7 +41,7 @@ export class ElicitationManager {
 
     // Check if expired
     if (Date.now() - state.createdAt > ELICITATION_TTL_MS) {
-      state.status = 'expired';
+      state.status = "expired";
       this.states.delete(elicitationId);
       return undefined;
     }
@@ -56,7 +56,7 @@ export class ElicitationManager {
     const state = this.states.get(elicitationId);
     if (!state) return false;
 
-    state.status = 'completed';
+    state.status = "completed";
     this.states.delete(elicitationId);
     return true;
   }
@@ -68,7 +68,7 @@ export class ElicitationManager {
     const state = this.states.get(elicitationId);
     if (!state) return false;
 
-    state.status = 'cancelled';
+    state.status = "cancelled";
     this.states.delete(elicitationId);
     return true;
   }

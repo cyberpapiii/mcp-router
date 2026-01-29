@@ -6,7 +6,7 @@
 /**
  * Elicitation mode - how user input is collected
  */
-export type ElicitationMode = 'form' | 'url';
+export type ElicitationMode = "form" | "url";
 
 /**
  * Base elicitation request
@@ -22,10 +22,10 @@ export interface ElicitationRequestBase {
  * Form mode elicitation - structured input via JSON Schema
  */
 export interface FormElicitationRequest extends ElicitationRequestBase {
-  mode: 'form';
+  mode: "form";
   /** JSON Schema for the form fields */
   schema: {
-    type: 'object';
+    type: "object";
     properties: Record<string, any>;
     required?: string[];
   };
@@ -35,7 +35,7 @@ export interface FormElicitationRequest extends ElicitationRequestBase {
  * URL mode elicitation - redirect to external URL (OAuth, etc.)
  */
 export interface UrlElicitationRequest extends ElicitationRequestBase {
-  mode: 'url';
+  mode: "url";
   /** External URL for user to complete action */
   url: string;
 }
@@ -45,7 +45,7 @@ export type ElicitationRequest = FormElicitationRequest | UrlElicitationRequest;
 /**
  * User action in response to elicitation
  */
-export type ElicitationAction = 'accept' | 'decline' | 'cancel';
+export type ElicitationAction = "accept" | "decline" | "cancel";
 
 /**
  * Response to form elicitation
@@ -79,7 +79,7 @@ export interface ElicitationState {
   backendServerId: string;
   mode: ElicitationMode;
   createdAt: number;
-  status: 'pending' | 'completed' | 'expired' | 'cancelled';
+  status: "pending" | "completed" | "expired" | "cancelled";
 }
 
 /**

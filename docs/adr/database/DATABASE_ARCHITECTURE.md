@@ -1,42 +1,42 @@
-# ADR: データベースアーキテクチャ
+# ADR: Database Architecture
 
-## ステータス
-承認済み
+## Status
+Approved
 
-## コンテキスト
-Electron アプリケーションのデータベース層は、複数のワークスペースをサポートし、各種エンティティ（サーバー、エージェント、ログなど）を永続化する必要があります。以下の要件を満たす必要がありました：
+## Context
+The database layer of the Electron application needs to support multiple workspaces and persist various entities (servers, agents, logs, etc.). The following requirements needed to be met:
 
-- **マルチワークスペース対応**: 各ワークスペースが独立したデータベースを持つ
-- **型安全性**: TypeScriptの型システムを活用した安全なデータアクセス
-- **パフォーマンス**: 大量のログデータの効率的な処理
-- **保守性**: 新しいエンティティの追加が容易
-- **トランザクション管理**: データの整合性を保証
+- **Multi-workspace support**: Each workspace has an independent database
+- **Type safety**: Safe data access utilizing TypeScript's type system
+- **Performance**: Efficient processing of large amounts of log data
+- **Maintainability**: Easy addition of new entities
+- **Transaction management**: Guarantee data integrity
 
-## 決定
+## Decision
 
-### ディレクトリ構造
+### Directory Structure
 
 ```
 apps/electron/src/main/infrastructure/database/
-├── core/                      # 核となるデータベース機能
-│   ├── base-repository.ts     # リポジトリ基底クラス
-│   ├── database-context.ts    # データベースコンテキスト管理
-│   └── sqlite-manager.ts      # SQLite接続管理
-├── factories/                 # ファクトリパターン実装
-│   └── repository-factory.ts  # リポジトリインスタンス管理
-├── migrations/                # データベースマイグレーション
-│   ├── main-database-migration.ts  # 基本マイグレーション
+├── core/                      # Core database functionality
+│   ├── base-repository.ts     # Repository base class
+│   ├── database-context.ts    # Database context management
+│   └── sqlite-manager.ts      # SQLite connection management
+├── factories/                 # Factory pattern implementation
+│   └── repository-factory.ts  # Repository instance management
+├── migrations/                # Database migrations
+│   ├── main-database-migration.ts  # Basic migration
 │   └── workspace-main-database-migration.ts
-├── repositories/              # リポジトリ実装
-│   ├── log/                  # ログリポジトリ
-│   ├── server/               # サーバーリポジトリ
-│   ├── settings/             # 設定リポジトリ
-│   ├── token/                # トークンリポジトリ
-│   └── workspace/            # ワークスペースリポジトリ
-├── schema/                   # スキーマ定義
-│   ├── database-schema.ts    # 統合スキーマ
-│   ├── schema-utils.ts       # スキーマユーティリティ
-│   └── tables/               # 個別テーブル定義
+├── repositories/              # Repository implementations
+│   ├── log/                  # Log repository
+│   ├── server/               # Server repository
+│   ├── settings/             # Settings repository
+│   ├── token/                # Token repository
+│   └── workspace/            # Workspace repository
+├── schema/                   # Schema definitions
+│   ├── database-schema.ts    # Unified schema
+│   ├── schema-utils.ts       # Schema utilities
+│   └── tables/               # Individual table definitions
 │       ├── hooks.ts
 │       ├── migrations.ts
 │       ├── request-logs.ts
@@ -44,18 +44,18 @@ apps/electron/src/main/infrastructure/database/
 │       ├── settings.ts
 │       ├── tokens.ts
 │       └── workspaces.ts
-└── ipc.ts                  # パブリックAPI
+└── ipc.ts                  # Public API
 ```
 
-### アーキテクチャパターン
+### Architecture Patterns
 
-#### 1. Repository パターン
+#### 1. Repository Pattern
 ```typescript
 export abstract class BaseRepository<T extends { id: string }> {
   protected db: SqliteManager;
   protected tableName: string;
-  
-  // 共通のCRUD操作
+
+  // Common CRUD operations
   public getAll(options: any = {}): T[]
   public getById(id: string): T | undefined
   public create(data: Omit<T, 'id'>): T
@@ -64,9 +64,9 @@ export abstract class BaseRepository<T extends { id: string }> {
 }
 ```
 
-各エンティティのリポジトリは `BaseRepository` を継承し、エンティティ固有の操作を追加します。
+Each entity's repository inherits from `BaseRepository` and adds entity-specific operations.
 
-#### 2. Factory パターン
+#### 2. Factory Pattern
 ```typescript
 export class RepositoryFactory {
   private static instances: RepositoryInstances = {
@@ -74,71 +74,71 @@ export class RepositoryFactory {
     log: null,
     // ...
   };
-  
+
   public static getServerRepository(db: SqliteManager): ServerRepository {
     if (this.isDatabaseChanged(db)) {
       this.resetAllInstances();
       this.currentDb = db;
     }
-    
+
     if (!this.instances.server) {
       this.instances.server = new ServerRepository(db);
     }
-    
+
     return this.instances.server;
   }
 }
 ```
 
-リポジトリインスタンスの生成と管理を一元化し、データベース切り替え時の整合性を保証します。
+Centralizes the creation and management of repository instances, ensuring consistency during database switches.
 
-#### 3. Context パターン
+#### 3. Context Pattern
 ```typescript
 export class DatabaseContext {
   private currentDatabase: SqliteManager | null = null;
-  
+
   public async getCurrentDatabase(): Promise<SqliteManager> {
     if (this.currentDatabase) {
       return this.currentDatabase;
     }
-    
+
     if (!this.databaseProvider) {
       throw new Error("Database provider not configured");
     }
-    
+
     return await this.databaseProvider();
   }
 }
 ```
 
-現在のワークスペースのデータベースコンテキストを管理し、アプリケーション全体で一貫性を保ちます。
+Manages the database context for the current workspace, maintaining consistency across the application.
 
-### データベース選択：SQLite + better-sqlite3
+### Database Selection: SQLite + better-sqlite3
 
-#### 選択理由
-1. **組み込みデータベース**: 外部プロセス不要
-2. **高パフォーマンス**: better-sqlite3は同期APIで高速
-3. **トランザクションサポート**: ACID特性を保証
-4. **軽量**: Electronアプリに最適
-5. **型安全性**: TypeScriptとの相性が良い
+#### Reasons for Selection
+1. **Embedded database**: No external process required
+2. **High performance**: better-sqlite3 provides fast synchronous API
+3. **Transaction support**: Guarantees ACID properties
+4. **Lightweight**: Ideal for Electron applications
+5. **Type safety**: Good compatibility with TypeScript
 
-### マルチワークスペース対応
+### Multi-workspace Support
 
-#### データベースの分離
-- **メインデータベース** (`mcprouter.db`): ワークスペース情報とグローバル設定
-- **ワークスペースデータベース** (`workspace-{id}.db`): 各ワークスペース固有のデータ
+#### Database Separation
+- **Main database** (`mcprouter.db`): Workspace information and global settings
+- **Workspace database** (`workspace-{id}.db`): Data specific to each workspace
 
-#### ワークスペース切り替え時の処理
-1. 現在のデータベース接続をクローズ
-2. 新しいワークスペースのデータベースを開く
-3. RepositoryFactoryがすべてのリポジトリインスタンスをリセット
-4. 新しいデータベースでリポジトリを再作成
+#### Processing During Workspace Switch
+1. Close the current database connection
+2. Open the new workspace's database
+3. RepositoryFactory resets all repository instances
+4. Recreate repositories with the new database
 
-### スキーマ管理
+### Schema Management
 
-#### 型定義との統合
+#### Integration with Type Definitions
 ```typescript
-// スキーマ定義
+// Schema definition
 export const serversTableSchema = {
   id: "TEXT PRIMARY KEY",
   name: "TEXT NOT NULL",
@@ -146,7 +146,7 @@ export const serversTableSchema = {
   // ...
 };
 
-// 型定義と自動的に同期
+// Automatically synced with type definitions
 export type ServerRecord = {
   id: string;
   name: string;
@@ -155,23 +155,23 @@ export type ServerRecord = {
 };
 ```
 
-#### マイグレーション戦略
-1. **自動マイグレーション**: アプリ起動時に実行
-2. **バージョン管理**: migrationsテーブルで管理
-3. **後方互換性**: 既存データの保護
+#### Migration Strategy
+1. **Automatic migration**: Executed at application startup
+2. **Version management**: Managed via migrations table
+3. **Backward compatibility**: Protection of existing data
 
-### パフォーマンス最適化
+### Performance Optimization
 
-#### 1. インデックス戦略
+#### 1. Index Strategy
 ```sql
 CREATE INDEX IF NOT EXISTS idx_request_logs_timestamp ON request_logs(timestamp);
 CREATE INDEX IF NOT EXISTS idx_request_logs_serverId ON request_logs(serverId);
 CREATE INDEX IF NOT EXISTS idx_request_logs_clientId ON request_logs(clientId);
 ```
 
-#### 2. バッチ処理
+#### 2. Batch Processing
 ```typescript
-// トランザクション内でバッチ処理
+// Batch processing within transaction
 this.db.transaction(() => {
   for (const item of items) {
     stmt.run(item);
@@ -179,60 +179,60 @@ this.db.transaction(() => {
 })();
 ```
 
-#### 3. プリペアドステートメント
+#### 3. Prepared Statements
 ```typescript
 const stmt = this.db.prepare("INSERT INTO servers VALUES (?, ?, ?)");
-// 再利用可能
+// Reusable
 ```
 
-## 結果
+## Consequences
 
-### 利点
-1. **型安全性**: コンパイル時エラー検出
-2. **パフォーマンス**: 同期APIによる高速アクセス
-3. **保守性**: 明確な責務分離
-4. **拡張性**: 新しいエンティティの追加が容易
-5. **信頼性**: トランザクションによるデータ整合性
+### Advantages
+1. **Type safety**: Compile-time error detection
+2. **Performance**: Fast access via synchronous API
+3. **Maintainability**: Clear separation of responsibilities
+4. **Extensibility**: Easy addition of new entities
+5. **Reliability**: Data integrity through transactions
 
-### 欠点
-1. **SQLite制限**: 同時書き込みの制限
-2. **メモリ使用**: 大量データ時のメモリ消費
-3. **バックアップ**: 手動でのバックアップが必要
+### Disadvantages
+1. **SQLite limitations**: Limited concurrent writes
+2. **Memory usage**: Memory consumption with large data volumes
+3. **Backup**: Manual backup required
 
-## 代替案
+## Alternatives Considered
 
 ### 1. IndexedDB
-- **却下理由**: メインプロセスでは使用不可、APIが複雑
+- **Reason for rejection**: Not available in main process, complex API
 
 ### 2. PostgreSQL/MySQL
-- **却下理由**: 外部プロセスが必要、デプロイが複雑
+- **Reason for rejection**: Requires external process, complex deployment
 
 ### 3. LevelDB
-- **却下理由**: SQLクエリ不可、リレーショナルデータに不向き
+- **Reason for rejection**: No SQL queries, unsuitable for relational data
 
-## セキュリティ考慮事項
+## Security Considerations
 
-1. **SQLインジェクション対策**: プリペアドステートメントの使用
-2. **データ暗号化**: 機密データ（トークン）の暗号化
-3. **アクセス制御**: ファイルシステムレベルでの保護
+1. **SQL injection prevention**: Use of prepared statements
+2. **Data encryption**: Encryption of sensitive data (tokens)
+3. **Access control**: Protection at file system level
 
-## 今後の拡張可能性
+## Future Extensibility
 
-1. **リモートデータベース**: クラウド同期のサポート
-2. **キャッシュレイヤー**: Redis互換キャッシュの追加
-3. **読み取り専用レプリカ**: パフォーマンス向上
-4. **自動バックアップ**: 定期バックアップ機能
+1. **Remote database**: Support for cloud synchronization
+2. **Cache layer**: Addition of Redis-compatible cache
+3. **Read-only replica**: Performance improvement
+4. **Automatic backup**: Periodic backup functionality
 
-## 更新履歴
-- **2025年8月**: スキーマ管理の統一化
-  - 全リポジトリがスキーマ定義ファイルを使用するよう更新
-  - DATABASE_SCHEMAオブジェクトによる一元管理を実装
-  - マイグレーションの責任範囲を既存テーブルの変更のみに限定
-  - hooksとtokensテーブルのスキーマ定義を追加
+## Update History
+- **August 2025**: Unification of schema management
+  - Updated all repositories to use schema definition files
+  - Implemented centralized management via DATABASE_SCHEMA object
+  - Limited migration responsibility to modifications of existing tables only
+  - Added schema definitions for hooks and tokens tables
 
-## 参考文献
+## References
 - [better-sqlite3 Documentation](https://github.com/WiseLibs/better-sqlite3)
 - [Repository Pattern](https://martinfowler.com/eaaCatalog/repository.html)
 - [SQLite Best Practices](https://www.sqlite.org/bestpractice.html)
-- [DATABASE_SCHEMA_MANAGEMENT.md](DATABASE_SCHEMA_MANAGEMENT.md) - スキーマ管理戦略
-- [DATABASE_DESIGN_PATTERNS.md](DATABASE_DESIGN_PATTERNS.md) - データベース設計パターン
+- [DATABASE_SCHEMA_MANAGEMENT.md](DATABASE_SCHEMA_MANAGEMENT.md) - Schema management strategy
+- [DATABASE_DESIGN_PATTERNS.md](DATABASE_DESIGN_PATTERNS.md) - Database design patterns

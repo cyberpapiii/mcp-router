@@ -6,59 +6,59 @@ Accepted
 
 ## Context
 
-MCP Routerは複数のワークスペースを持つmonorepoプロジェクトです。コードベースが成長するにつれて、以下の課題が顕在化しています：
+MCP Router is a monorepo project with multiple workspaces. As the codebase grows, the following challenges have become apparent:
 
-- 未使用のコード、依存関係、エクスポートの蓄積
-- 不要な依存関係によるビルド時間の増加とバンドルサイズの肥大化
-- メンテナンスコストの増加
-- 新規開発者にとってのコードベースの理解の困難さ
+- Accumulation of unused code, dependencies, and exports
+- Increased build times and bloated bundle sizes due to unnecessary dependencies
+- Increased maintenance costs
+- Difficulty for new developers to understand the codebase
 
-これらの課題を解決するため、自動的にデッドコードを検出し、コードベースをクリーンに保つ仕組みが必要です。
+To address these challenges, we need a mechanism to automatically detect dead code and keep the codebase clean.
 
 ## Decision
 
-[Knip](https://knip.dev/)を採用し、monorepo全体でデッドコード検出を自動化します。
+We adopt [Knip](https://knip.dev/) to automate dead code detection across the entire monorepo.
 
-### 選定理由
+### Rationale
 
-1. **TypeScript/JavaScript特化**: TypeScriptプロジェクトに最適化されており、型情報を活用した正確な分析が可能
-2. **Monorepoサポート**: ワークスペース単位での分析と設定が可能
-3. **包括的な検出**: ファイル、依存関係、エクスポートの未使用を一元的に検出
-4. **CI/CD統合**: 自動化パイプラインへの組み込みが容易
-5. **Turbo対応**: キャッシュを活用した高速な分析が可能
+1. **TypeScript/JavaScript Specialized**: Optimized for TypeScript projects, enabling accurate analysis using type information
+2. **Monorepo Support**: Supports per-workspace analysis and configuration
+3. **Comprehensive Detection**: Centralized detection of unused files, dependencies, and exports
+4. **CI/CD Integration**: Easy to incorporate into automation pipelines
+5. **Turbo Compatible**: Enables fast analysis leveraging caching
 
 ## Consequences
 
 ### Positive
 
-1. **コード品質の向上**
-   - 未使用コードの自動検出により、コードベースがクリーンに保たれる
-   - 定期的な分析により、技術的負債の蓄積を防げる
+1. **Improved Code Quality**
+   - Automatic detection of unused code keeps the codebase clean
+   - Regular analysis prevents accumulation of technical debt
 
-2. **ビルドパフォーマンスの改善**
-   - 不要な依存関係の削除によりビルド時間が短縮
-   - バンドルサイズの削減による配布物のサイズ最適化
+2. **Improved Build Performance**
+   - Reduced build times by removing unnecessary dependencies
+   - Optimized distribution size through reduced bundle size
 
-3. **開発者体験の向上**
-   - コードベースの可読性向上
-   - 新規開発者のオンボーディングが容易に
+3. **Improved Developer Experience**
+   - Improved codebase readability
+   - Easier onboarding for new developers
 
-4. **自動化によるコスト削減**
-   - 手動でのデッドコード検出作業が不要
-   - CI/CDパイプラインでの自動チェック
+4. **Cost Reduction Through Automation**
+   - Eliminates manual dead code detection work
+   - Automatic checks in CI/CD pipeline
 
 ### Negative
 
-1. **初期設定の複雑さ**
-   - 各ワークスペースごとの設定が必要
-   - False positiveへの対応（ignore設定の調整）
+1. **Initial Configuration Complexity**
+   - Configuration required for each workspace
+   - Handling false positives (adjusting ignore settings)
 
-2. **ビルドパイプラインへの負荷**
-   - 分析処理による追加の実行時間
-   - （Turboキャッシュにより軽減可能）
+2. **Build Pipeline Overhead**
+   - Additional execution time for analysis processing
+   - (Can be mitigated with Turbo cache)
 ## Implementation
 
-### アーキテクチャ
+### Architecture
 
 ```
 ┌─────────────────────────────────────────────────┐
@@ -74,54 +74,54 @@ MCP Routerは複数のワークスペースを持つmonorepoプロジェクト�
 └─────────────┘ └─────────────┘ └─────────────┘
 ```
 
-### デバッグとトラブルシューティング
+### Debugging and Troubleshooting
 
 ```bash
-# デバッグ情報付きで実行
+# Run with debug information
 pnpm knip --debug
 
-# 設定のヒントを表示
+# Show configuration hints
 pnpm knip --include-config-hints
 
-# ドライラン
+# Dry run
 pnpm turbo knip --dry-run
 ```
 
-### パフォーマンス最適化
+### Performance Optimization
 
-1. **Turboキャッシュの活用**: 常に`pnpm turbo knip`で実行
-2. **ワークスペースフィルタリング**: `--filter`で特定ワークスペースのみ分析
-3. **並列実行**: Turboによる複数ワークスペースの並列分析
-4. **インプット設定**: 変更検出用のファイルパターンを最適化
+1. **Leverage Turbo Cache**: Always run with `pnpm turbo knip`
+2. **Workspace Filtering**: Analyze specific workspaces only with `--filter`
+3. **Parallel Execution**: Parallel analysis of multiple workspaces via Turbo
+4. **Input Configuration**: Optimize file patterns for change detection
 
-### 運用ガイドライン
+### Operational Guidelines
 
-1. **定期実行**
-   - 開発中: `pnpm knip`で随時チェック
-   - PR時: CIで自動チェック
-   - 週次: 全体スキャンとレポート生成
+1. **Regular Execution**
+   - During development: Check as needed with `pnpm knip`
+   - On PR: Automatic check via CI
+   - Weekly: Full scan and report generation
 
-2. **False Positive対応**
-   - 必要に応じて`knip.json`のignoreパターンを更新
-   - ワークスペース固有の設定を活用
+2. **Handling False Positives**
+   - Update ignore patterns in `knip.json` as needed
+   - Utilize workspace-specific configurations
 
-3. **段階的改善**
-   - 既存のデッドコードは段階的に削除
-   - 新規コードではゼロトレランス
+3. **Incremental Improvement**
+   - Remove existing dead code gradually
+   - Zero tolerance for new code
 
 ## Alternatives Considered
 
 1. **ESLint no-unused-vars**
-   - 制限: ファイルレベルの未使用検出ができない
-   - 制限: 依存関係の分析ができない
+   - Limitation: Cannot detect unused at file level
+   - Limitation: Cannot analyze dependencies
 
 2. **ts-prune**
-   - 制限: TypeScriptのエクスポートのみ対象
-   - 制限: Monorepoサポートが限定的
+   - Limitation: Only targets TypeScript exports
+   - Limitation: Limited monorepo support
 
-3. **手動チェック**
-   - 問題: スケーラブルでない
-   - 問題: 人的エラーのリスク
+3. **Manual Checking**
+   - Problem: Not scalable
+   - Problem: Risk of human error
 
 ## References
 

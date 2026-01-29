@@ -1,75 +1,75 @@
-# MCP Hook API リファレンス
+# MCP Hook API Reference
 
-## 概要
+## Overview
 
-MCP RouterのHookシステムは、MCPリクエストの処理前後にカスタムロジックを実行できる拡張機能です。JavaScriptで記述されたHookスクリプトは、サンドボックス環境で安全に実行されます。
+The MCP Router Hook system is an extension feature that allows custom logic to be executed before and after MCP request processing. Hook scripts written in JavaScript are executed safely in a sandboxed environment.
 
-## Hook実行タイミング
+## Hook Execution Timing
 
 ### Pre-hook
-- MCPリクエストがサーバーに送信される**前**に実行
-- リクエストの検証、変更、またはブロックが可能
-- 認証・認可、レート制限、リクエスト変換などに使用
+- Executed **before** the MCP request is sent to the server
+- Can validate, modify, or block requests
+- Used for authentication/authorization, rate limiting, request transformation, etc.
 
 ### Post-hook
-- MCPサーバーからレスポンスを受信した**後**に実行
-- レスポンスの検証、変更、ログ記録が可能
-- メトリクス収集、レスポンス変換、通知などに使用
+- Executed **after** receiving the response from the MCP server
+- Can validate, modify, and log responses
+- Used for metrics collection, response transformation, notifications, etc.
 
-## スクリプト実行環境
+## Script Execution Environment
 
-### 利用可能なグローバル変数
+### Available Global Variables
 
 #### `context` (HookContext)
-現在のリクエスト/レスポンスに関する情報を含むオブジェクト：
+An object containing information about the current request/response:
 
 ```typescript
 interface HookContext {
-  // 純粋なMCPリクエスト
+  // Pure MCP request
   request: {
-    method: string;        // MCPメソッド名（"tools/call", "tools/list"など）
-    params: any;           // MCPプロトコルのパラメータ
+    method: string;        // MCP method name ("tools/call", "tools/list", etc.)
+    params: any;           // MCP protocol parameters
   };
 
-  // 純粋なMCPレスポンス（Post-hookでのみ利用可能）
-  response?: any;          // サーバーからのレスポンス
+  // Pure MCP response (available only in Post-hook)
+  response?: any;          // Response from the server
 
-  // アプリケーション固有のメタデータ
+  // Application-specific metadata
   metadata: {
-    // クライアント情報（必須）
-    clientId: string;      // クライアントID
-    
-    // サーバー情報（オプション）
-    serverId?: string;     // サーバーID
-    serverName?: string;   // サーバー名
-    
-    // エラー情報
-    error?: Error;         // エラー情報（Post-hookでのみ）
-    
-    // Hook間共有データ
-    shared?: Record<string, any>;  // Hook間でデータを共有するための領域
+    // Client information (required)
+    clientId: string;      // Client ID
+
+    // Server information (optional)
+    serverId?: string;     // Server ID
+    serverName?: string;   // Server name
+
+    // Error information
+    error?: Error;         // Error information (Post-hook only)
+
+    // Shared data between Hooks
+    shared?: Record<string, any>;  // Area for sharing data between Hooks
   };
 }
 ```
 
 #### `console`
-ログ出力用のオブジェクト：
-- `console.log(...args)` - 情報ログ
-- `console.info(...args)` - 情報ログ
-- `console.warn(...args)` - 警告ログ
-- `console.error(...args)` - エラーログ
+Object for log output:
+- `console.log(...args)` - Information log
+- `console.info(...args)` - Information log
+- `console.warn(...args)` - Warning log
+- `console.error(...args)` - Error log
 
-### 利用可能なユーティリティ関数
+### Available Utility Functions
 
 #### `sleep(ms: number): Promise<void>`
-指定されたミリ秒間処理を一時停止します。
+Pauses processing for the specified number of milliseconds.
 
 ```javascript
-await sleep(1000); // 1秒待機
+await sleep(1000); // Wait 1 second
 ```
 
 #### `getServerInfo(serverId: string): object`
-サーバー情報を取得します（現在は簡易実装）。
+Gets server information (currently a simplified implementation).
 
 ```javascript
 const serverInfo = getServerInfo(context.metadata.serverId);
@@ -77,17 +77,17 @@ console.log("Server name:", serverInfo.name);
 ```
 
 #### `fetch(url: string, options?: object): Promise<Response>`
-HTTPSリクエストを送信します。セキュリティのため、以下の制限があります：
-- HTTPSのURLのみ許可（HTTPは不可）
-- タイムアウトは3秒
-- cookie と authorization ヘッダーは自動削除
+Sends HTTPS requests. For security reasons, the following restrictions apply:
+- Only HTTPS URLs are allowed (HTTP is not allowed)
+- Timeout is 3 seconds
+- cookie and authorization headers are automatically removed
 
 ```javascript
-// GET リクエスト
+// GET request
 const response = await fetch('https://api.example.com/data');
 const data = await response.json();
 
-// POST リクエスト
+// POST request
 const response = await fetch('https://api.example.com/validate', {
   method: 'POST',
   headers: {
@@ -96,7 +96,7 @@ const response = await fetch('https://api.example.com/validate', {
   body: JSON.stringify({ key: 'value' })
 });
 
-// レスポンスオブジェクト
+// Response object
 // {
 //   ok: boolean,
 //   status: number,
@@ -107,43 +107,43 @@ const response = await fetch('https://api.example.com/validate', {
 // }
 ```
 
-## スクリプトの戻り値
+## Script Return Value
 
-Hookスクリプトは必ず`HookResult`形式のオブジェクトを返す必要があります：
+Hook scripts must return an object in `HookResult` format:
 
 ```typescript
 interface HookResult {
-  // 処理を続行するかどうか
+  // Whether to continue processing
   continue: boolean;
 
-  // 変更されたコンテキスト（省略可能）
-  // 指定した場合、次のHookやMCPサーバーへ渡されるリクエストが更新される
+  // Modified context (optional)
+  // If specified, the request passed to the next Hook or MCP server will be updated
   context?: HookContext;
 
-  // エラー発生時のエラー情報
+  // Error information when an error occurs
   error?: {
-    code: string;      // エラーコード
-    message: string;   // エラーメッセージ
+    code: string;      // Error code
+    message: string;   // Error message
   };
 }
 ```
 
-## サンプルコード
+## Sample Code
 
-### 1. リクエスト変更（Pre-hook）
+### 1. Request Modification (Pre-hook)
 
 ```javascript
-// 特定のツール呼び出しにカスタムパラメータを追加
+// Add custom parameters to specific tool calls
 if (context.request.method === "tools/call" && context.request.params.name === "search") {
-  // リクエストパラメータを変更
+  // Modify request parameters
   const modifiedContext = {
     ...context,
     request: {
       ...context.request,
       params: {
         ...context.request.params,
-        maxResults: 10,  // 最大結果数を制限
-        language: "ja"   // 言語を日本語に固定
+        maxResults: 10,  // Limit maximum results
+        language: "ja"   // Fix language to Japanese
       }
     }
   };
@@ -157,27 +157,27 @@ if (context.request.method === "tools/call" && context.request.params.name === "
 return { continue: true };
 ```
 
-### 2. レート制限（Pre-hook）
+### 2. Rate Limiting (Pre-hook)
 
 ```javascript
-// メタデータを使用してレート制限を実装
+// Implement rate limiting using metadata
 const rateLimit = context.metadata.shared?.rateLimit || {};
 const clientKey = `${context.metadata.clientId}_${context.request.method}`;
 const now = Date.now();
 
-// 前回のリクエスト時刻を確認
+// Check last request time
 const lastRequest = rateLimit[clientKey];
-if (lastRequest && (now - lastRequest) < 1000) {  // 1秒以内
+if (lastRequest && (now - lastRequest) < 1000) {  // Within 1 second
   return {
     continue: false,
     error: {
       code: "RATE_LIMIT_EXCEEDED",
-      message: "リクエストが頻繁すぎます。1秒後に再試行してください。"
+      message: "Too many requests. Please retry after 1 second."
     }
   };
 }
 
-// 最新のリクエスト時刻を記録
+// Record latest request time
 rateLimit[clientKey] = now;
 
 return {
@@ -195,34 +195,34 @@ return {
 };
 ```
 
-### 3. レスポンスログ（Post-hook）
+### 3. Response Logging (Post-hook)
 
 ```javascript
-// レスポンスサイズをログ
+// Log response size
 const responseSize = JSON.stringify(context.response || {}).length;
 console.log(`Request completed:`, {
   method: context.request.method,
   server: context.metadata.serverName,
-  tool: context.request.params?.name,  // tools/callの場合
+  tool: context.request.params?.name,  // For tools/call
   responseSize: responseSize,
   hasError: !!context.metadata.error
 });
 
-// エラーの場合は詳細をログ
+// Log details if error
 if (context.metadata.error) {
   console.error("Request failed:", context.metadata.error);
 }
 
-// 処理を続行
+// Continue processing
 return { continue: true };
 ```
 
-### 4. レスポンス変換（Post-hook）
+### 4. Response Transformation (Post-hook)
 
 ```javascript
-// ツールのレスポンスをフィルタリング
+// Filter tool responses
 if (context.request.method === "tools/list" && context.response) {
-  // 特定のツールを除外
+  // Exclude specific tools
   const filteredTools = context.response.tools.filter(tool => {
     return !tool.name.startsWith("internal_");
   });
@@ -244,17 +244,17 @@ if (context.request.method === "tools/list" && context.response) {
 return { continue: true };
 ```
 
-### 5. 条件付き実行
+### 5. Conditional Execution
 
 ```javascript
-// 特定のサーバーのみで実行
+// Execute only for specific servers
 const targetServers = ["production-server", "staging-server"];
 if (!targetServers.includes(context.metadata.serverName)) {
-  // このサーバーでは何もしない
+  // Do nothing for this server
   return { continue: true };
 }
 
-// 営業時間外のアクセスを制限
+// Restrict access outside business hours
 const now = new Date();
 const hour = now.getHours();
 if (hour < 9 || hour >= 18) {
@@ -262,7 +262,7 @@ if (hour < 9 || hour >= 18) {
     continue: false,
     error: {
       code: "OUTSIDE_BUSINESS_HOURS",
-      message: "営業時間外です（9:00-18:00）"
+      message: "Outside business hours (9:00-18:00)"
     }
   };
 }
@@ -270,24 +270,24 @@ if (hour < 9 || hour >= 18) {
 return { continue: true };
 ```
 
-### 6. 外部APIによる検証（Gemini API例）
+### 6. External API Validation (Gemini API Example)
 
 ```javascript
-// Gemini APIを使用したリクエスト検証
-const API_KEY = "YOUR_API_KEY"; // 環境変数から取得することを推奨
+// Request validation using Gemini API
+const API_KEY = "YOUR_API_KEY"; // Recommended to get from environment variables
 const API_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent";
 
 try {
   const requestBody = {
     system_instruction: {
       parts: {
-        text: "MCPリクエストのセキュリティを検証してください。" +
-              '{"safe": boolean, "reason": string} 形式で応答。'
+        text: "Please validate the security of the MCP request. " +
+              'Respond in {"safe": boolean, "reason": string} format.'
       }
     },
     contents: [{
       parts: [{
-        text: "リクエスト情報: " + JSON.stringify({
+        text: "Request information: " + JSON.stringify({
           type: context.requestType,
           server: context.serverName,
           tool: context.toolName,
@@ -311,7 +311,7 @@ try {
     const validation = JSON.parse(
       result.candidates?.[0]?.content?.parts?.[0]?.text || "{}"
     );
-    
+
     if (!validation.safe) {
       return {
         continue: false,
@@ -324,29 +324,29 @@ try {
   }
 } catch (error) {
   console.error("API validation error:", error);
-  // エラー時はフォールバック処理
+  // Fallback processing on error
 }
 
 return { continue: true };
 ```
 
-## エラーハンドリング
+## Error Handling
 
-### スクリプトエラー
-スクリプト内でエラーが発生した場合、自動的に以下の形式で返されます：
+### Script Errors
+When an error occurs within a script, it is automatically returned in the following format:
 
 ```javascript
 {
   continue: false,
   error: {
     code: "SCRIPT_ERROR",
-    message: "エラーメッセージ"
+    message: "Error message"
   }
 }
 ```
 
-### タイムアウト
-スクリプトの実行時間は5秒に制限されています。タイムアウトした場合：
+### Timeout
+Script execution time is limited to 5 seconds. When timeout occurs:
 
 ```javascript
 {
@@ -358,18 +358,18 @@ return { continue: true };
 }
 ```
 
-## ベストプラクティス
+## Best Practices
 
-1. **早期リターン**: 条件に合わない場合は早めに`return { continue: true }`
-2. **エラーハンドリング**: try-catchでエラーを適切に処理
-3. **パフォーマンス**: 重い処理は避ける（タイムアウト5秒）
-4. **ログ出力**: デバッグに役立つ情報を適切にログ出力
-5. **メタデータ活用**: Hook間でのデータ共有にmetadataを使用
+1. **Early Return**: Return `{ continue: true }` early if conditions are not met
+2. **Error Handling**: Handle errors appropriately with try-catch
+3. **Performance**: Avoid heavy processing (5 second timeout)
+4. **Log Output**: Output appropriate debug information to logs
+5. **Metadata Utilization**: Use metadata for data sharing between Hooks
 
-## 制限事項
+## Limitations
 
-- 外部APIへのアクセスは不可
-- ファイルシステムへのアクセスは不可
-- Node.jsモジュールのimportは不可
-- 実行時間は最大5秒
-- 無限ループは自動的に終了される
+- External API access is restricted
+- File system access is not allowed
+- Node.js module imports are not allowed
+- Maximum execution time is 5 seconds
+- Infinite loops are automatically terminated

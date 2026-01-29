@@ -2,7 +2,7 @@
 
 ## Overview
 
-Agent Skillsは、AIエージェントに専門知識やワークフローを教えるためのオープンスタンダード。MCP RouterでSkillsを一元管理し、各AIエージェントの個人用ディレクトリにシンボリックリンクを自動作成する。
+Agent Skills is an open standard for teaching AI agents specialized knowledge and workflows. MCP Router centrally manages Skills and automatically creates symbolic links to each AI agent's personal directory.
 
 ## Architecture
 
@@ -10,20 +10,20 @@ Agent Skillsは、AIエージェントに専門知識やワークフローを教
 
 ```
 apps/electron/src/main/modules/skills/
-├── agent-path.repository.ts # エージェントパスDB操作
-├── skills-agent-paths.ts    # エージェントパスユーティリティ
-├── skills-file-manager.ts   # ファイルシステム操作
-├── skills.repository.ts     # データベース操作
-├── skills.service.ts        # ビジネスロジック
-└── skills.ipc.ts            # IPCハンドラー
+├── agent-path.repository.ts # Agent path DB operations
+├── skills-agent-paths.ts    # Agent path utilities
+├── skills-file-manager.ts   # File system operations
+├── skills.repository.ts     # Database operations
+├── skills.service.ts        # Business logic
+└── skills.ipc.ts            # IPC handlers
 ```
 
 ### Type Definitions
 
 ```
 packages/shared/src/types/
-├── skill-types.ts                      # ドメイン型
-└── platform-api/domains/skills-api.ts  # API型
+├── skill-types.ts                      # Domain types
+└── platform-api/domains/skills-api.ts  # API types
 ```
 
 ## Data Model
@@ -33,24 +33,24 @@ packages/shared/src/types/
 ```typescript
 interface Skill {
   id: string;
-  name: string;              // ディレクトリ名（一意）、パスは name から導出可能
-  projectId: string | null;  // オプショナルなプロジェクト紐づけ
-  enabled: boolean;          // スキルの有効/無効状態
+  name: string;              // Directory name (unique), path can be derived from name
+  projectId: string | null;  // Optional project association
+  enabled: boolean;          // Skill enabled/disabled state
   createdAt: number;
   updatedAt: number;
 }
 
-// API応答用（contentを含む）
+// For API responses (includes content)
 interface SkillWithContent extends Skill {
   content: string | null;    // SKILL.md content
 }
 ```
 
-> **Note:** スキルのフォルダパスは `name` から導出可能（`{userData}/skills/{name}`）なため、DBには保存しない。
+> **Note:** The skill folder path can be derived from `name` (`{userData}/skills/{name}`), so it is not stored in the DB.
 
 ## API Design
 
-シンプルなCRUD + アクションの6つのAPIに統合。
+Consolidated into 6 simple APIs: CRUD + actions.
 
 ```typescript
 interface SkillsAPI {
@@ -61,11 +61,11 @@ interface SkillsAPI {
   delete: (id: string) => Promise<void>;
 
   // Actions
-  openFolder: (id?: string) => Promise<void>;  // id省略でskillsディレクトリ全体
-  import: () => Promise<Skill>;                 // フォルダ選択ダイアログ→インポート
+  openFolder: (id?: string) => Promise<void>;  // Omit id to open entire skills directory
+  import: () => Promise<Skill>;                 // Folder selection dialog → import
 }
 
-// updateでenabled/contentも更新可能
+// enabled/content can also be updated via update
 interface UpdateSkillInput {
   name?: string;
   projectId?: string | null;
@@ -76,7 +76,7 @@ interface UpdateSkillInput {
 
 ## Supported Agents
 
-デフォルトで5つのエージェントがサポートされ、`agent_paths`テーブルに初期データとして登録されます。ユーザーはUI上でカスタムエージェントパスを追加・削除できます。
+By default, 5 agents are supported and registered as initial data in the `agent_paths` table. Users can add or remove custom agent paths through the UI.
 
 | Agent | Skills Directory |
 |-------|-----------------|
@@ -88,37 +88,37 @@ interface UpdateSkillInput {
 
 ### Custom Agent Paths
 
-ユーザーは「連携先」ページから任意のエージェントパスを追加できます。追加されたパスは`agent_paths`テーブルに保存され、スキル有効時にシンボリックリンクが作成されます。
+Users can add custom agent paths from the "Integrations" page. Added paths are saved in the `agent_paths` table, and symbolic links are created when skills are enabled.
 
 ## Key Design Decisions
 
 ### 1. Automatic Symlink Creation
 
-スキル作成時に全エージェントへ自動でシンボリックリンクを作成する。これにより、ユーザーは一箇所でスキルを管理でき、複数のエージェントで同じスキルを共有できる。
+When a skill is created, symbolic links are automatically created for all agents. This allows users to manage skills in one place and share the same skill across multiple agents.
 
 ### 2. Filesystem-based Symlink Management
 
-シンボリックリンクの状態はファイルシステムを真実の源（source of truth）として管理する。DBでシンボリックリンクを追跡せず、起動時にファイルシステムと同期することで簡潔さを保つ。
+Symlink state is managed with the filesystem as the source of truth. Instead of tracking symlinks in the DB, we maintain simplicity by syncing with the filesystem at startup.
 
 ### 3. Skill Enable/Disable Toggle
 
-スキルごとにOn/Off切り替えが可能。無効にするとすべてのエージェントからシンボリックリンクを削除し、有効にすると再作成する。UIではシンプルなスイッチで切り替え可能。
+Each skill can be toggled On/Off. When disabled, symbolic links are removed from all agents; when enabled, they are recreated. The UI provides a simple switch for toggling.
 
 ### 4. Optional Project Association
 
-スキルはオプショナルにプロジェクトに紐づけ可能。`projectId: string | null`で管理。
+Skills can optionally be associated with a project. Managed via `projectId: string | null`.
 
 ### 5. SKILL.md Template Generation
 
-スキル作成時にSKILL.mdテンプレートを自動生成。
+A SKILL.md template is automatically generated when a skill is created.
 
 ### 6. Symlink Verification & Repair
 
-アプリ起動時にシンボリックリンクの状態を検証し、破損したリンクを自動修復（再作成）。
+At app startup, symlink state is verified and broken links are automatically repaired (recreated).
 
 ### 7. Folder Import
 
-外部フォルダをフォルダ選択ダイアログでインポート可能。インポート時にスキルディレクトリにコピーされ、自動でシンボリックリンクが作成される。
+External folders can be imported via a folder selection dialog. When imported, they are copied to the skills directory and symbolic links are automatically created.
 
 ## Storage Location
 
@@ -134,7 +134,7 @@ Skills are stored in:
 | Column | Type | Description |
 |--------|------|-------------|
 | id | TEXT | Primary key |
-| name | TEXT | Unique skill name (パスは`{userData}/skills/{name}`から導出) |
+| name | TEXT | Unique skill name (path derived from `{userData}/skills/{name}`) |
 | project_id | TEXT | Optional project ID |
 | enabled | INTEGER | 1=enabled, 0=disabled |
 | created_at | INTEGER | Timestamp |
@@ -142,7 +142,7 @@ Skills are stored in:
 
 ### agent_paths table
 
-シンボリックリンク先として使用されるエージェントパスを管理します。
+Manages agent paths used as symlink destinations.
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -152,11 +152,11 @@ Skills are stored in:
 | created_at | INTEGER | Timestamp |
 | updated_at | INTEGER | Timestamp |
 
-初回起動時に5つの標準エージェントが自動登録されます。
+The 5 standard agents are automatically registered on first launch.
 
 ## Future Considerations
 
-1. **Remote Workspace Support**: 現在はローカルワークスペースのみ対応
-2. **Skill Export**: スキルのエクスポート・バックアップ機能（インポートは実装済み）
-3. **Skill Templates**: 事前定義されたスキルテンプレート
-4. **Cloud Sync**: クラウドを介したスキル同期
+1. **Remote Workspace Support**: Currently only local workspaces are supported
+2. **Skill Export**: Skill export/backup functionality (import is already implemented)
+3. **Skill Templates**: Pre-defined skill templates
+4. **Cloud Sync**: Skill synchronization via cloud

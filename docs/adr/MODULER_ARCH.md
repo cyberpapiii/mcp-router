@@ -1,105 +1,105 @@
-# ADR: モジュラーアーキテクチャへのリファクタリング
+# ADR: Refactoring to Modular Architecture
 
-## ステータス
-部分的に実施済み（2025年1月）
+## Status
+Partially Implemented (January 2025)
 
-## コンテキスト
+## Context
 
-現在のElectronアプリケーションのメインプロセスは3層構造（application、infrastructure、utils）を採用しています。しかし、以下の問題が残存しています：
+The current Electron application's main process uses a 3-layer structure (application, infrastructure, utils). However, the following issues remain:
 
-### 現状の問題点
+### Current Issues
 
-1. **循環依存の発生**
+1. **Circular Dependencies**
     - infrastructure → application
     - application → infrastructure
-    - 層間の相互依存が残存
+    - Mutual dependencies between layers persist
 
-2. **責任境界の不明確さ**
-    - applicationに統合されたが機能の分類が不明確
-    - 同一機能が複数ディレクトリに分散
-    - 新規開発者が適切な配置場所を判断できない
+2. **Unclear Responsibility Boundaries**
+    - Features are integrated into application but classification is unclear
+    - Same functionality is scattered across multiple directories
+    - New developers cannot determine appropriate placement
 
-3. **コントリビューションの困難さ**
-    - 複雑な層構造により学習コストが高い
-    - どこに何があるか直感的でない
-    - テストの書き方が不明確
+3. **Contribution Difficulties**
+    - Complex layer structure leads to high learning costs
+    - Unclear where things are located
+    - Unclear how to write tests
 
-4. **保守性の低下**
-    - 機能追加時に複数層の変更が必要
-    - リファクタリングが困難
-    - テストカバレッジの確保が難しい
+4. **Decreased Maintainability**
+    - Adding features requires changes across multiple layers
+    - Refactoring is difficult
+    - Ensuring test coverage is challenging
 
-## 決定
+## Decision
 
-機能モジュール単位で自己完結した構造（Modular Architecture）を採用します。
+We adopt a self-contained structure organized by feature modules (Modular Architecture).
 
-### 新しいディレクトリ構造
+### New Directory Structure
 
 ```
 apps/electron/src/main/
-├── modules/                 # 機能モジュール（自己完結）- 将来の目標構造
-│   ├── auth/               # 認証モジュール
-│   │   ├── auth.service.ts        # ビジネスロジック
-│   │   ├── auth.repository.ts     # データアクセス
-│   │   ├── auth.ipc.ts           # IPCハンドラー
-│   │   ├── auth.types.ts         # 型定義
-│   │   └── __tests__/            # テスト
+├── modules/                 # Feature modules (self-contained) - Future target structure
+│   ├── auth/               # Authentication module
+│   │   ├── auth.service.ts        # Business logic
+│   │   ├── auth.repository.ts     # Data access
+│   │   ├── auth.ipc.ts           # IPC handlers
+│   │   ├── auth.types.ts         # Type definitions
+│   │   └── __tests__/            # Tests
 │   │       ├── auth.service.test.ts
 │   │       └── auth.repository.test.ts
 │   │
-│   ├── mcp/                # MCPモジュール
+│   ├── mcp/                # MCP module
 │   │   ├── mcp.service.ts
 │   │   ├── mcp.repository.ts
 │   │   ├── mcp.ipc.ts
 │   │   ├── mcp.types.ts
 │   │   └── __tests__/
 │   │
-│   ├── workflow/           # ワークフローモジュール
+│   ├── workflow/           # Workflow module
 │   │   ├── workflow.service.ts
 │   │   ├── workflow.repository.ts
 │   │   ├── workflow.ipc.ts
 │   │   ├── workflow.types.ts
 │   │   └── __tests__/
 │   │
-│   └── workspace/          # ワークスペースモジュール
+│   └── workspace/          # Workspace module
 │       ├── workspace.service.ts
 │       ├── workspace.repository.ts
 │       ├── workspace.ipc.ts
 │       ├── workspace.types.ts
 │       └── __tests__/
-├── utils/                 # ユーティリティ
+├── utils/                 # Utilities
 │   ├── logger.ts
 │   ├── fetch.ts
 │   └── environment.ts
 │
-└── main.ts                # アプリケーションエントリーポイント
+└── main.ts                # Application entry point
 ```
 
-### モジュール構造の詳細
+### Module Structure Details
 
-各モジュールは以下のファイルで構成されます：
+Each module consists of the following files:
 
-1. **`.service.ts`** - ビジネスロジック
-    - ドメイン知識の実装
-    - ビジネスルールの適用
-    - 外部依存はインターフェース経由
+1. **`.service.ts`** - Business logic
+    - Domain knowledge implementation
+    - Business rule application
+    - External dependencies via interfaces
 
-2. **`.repository.ts`** - データアクセス層
-    - データベースとのやり取り
-    - データの永続化と取得
-    - SQLiteManager経由でのアクセス
+2. **`.repository.ts`** - Data access layer
+    - Interaction with database
+    - Data persistence and retrieval
+    - Access via SQLiteManager
 
-3. **`.ipc.ts`** - IPCハンドラー
-    - レンダラープロセスとの通信
-    - サービスメソッドの呼び出し
-    - レスポンスの整形
+3. **`.ipc.ts`** - IPC handlers
+    - Communication with renderer process
+    - Calling service methods
+    - Response formatting
 
-4. **`.types.ts`** - 型定義
-    - モジュール固有の型
-    - インターフェース定義
-    - 定数定義
+4. **`.types.ts`** - Type definitions
+    - Module-specific types
+    - Interface definitions
+    - Constant definitions
 
-### 依存関係のルール
+### Dependency Rules
 
 ```
 IPC Handler → Service → Repository → Shared Database
@@ -107,11 +107,11 @@ IPC Handler → Service → Repository → Shared Database
    Types       Types       Types
 ```
 
-- **単方向依存**: 上位層は下位層のみに依存
-- **横の依存禁止**: モジュール間の直接依存は避ける
-- **共通機能経由**: モジュール間連携は共有インターフェース経由
+- **Unidirectional dependency**: Upper layers depend only on lower layers
+- **No horizontal dependencies**: Avoid direct dependencies between modules
+- **Via common features**: Inter-module communication goes through shared interfaces
 
-### 依存性注入パターン
+### Dependency Injection Pattern
 
 ```typescript
 // modules/auth/auth.service.ts
@@ -122,18 +122,18 @@ export interface AuthRepository {
 
 export class AuthService {
   constructor(private repository: AuthRepository) {}
-  
+
   async authenticate(email: string, password: string) {
-    // ビジネスロジック
+    // Business logic
   }
 }
 
 // modules/auth/auth.repository.ts
 export class AuthRepositoryImpl implements AuthRepository {
   constructor(private db: Database) {}
-  
+
   async findUserByEmail(email: string) {
-    // データベースアクセス
+    // Database access
   }
 }
 
@@ -145,7 +145,7 @@ export function registerAuthHandlers(authService: AuthService) {
 }
 ```
 
-### テスト戦略
+### Test Strategy
 
 ```typescript
 // modules/auth/__tests__/auth.service.test.ts
@@ -174,56 +174,56 @@ describe('AuthService', () => {
 });
 ```
 
-## 結果
+## Consequences
 
-### メリット
+### Advantages
 
-1. **理解しやすさ**
-    - 機能単位で完結
-    - ファイル配置が直感的
-    - 新規開発者の学習コストが低い
+1. **Ease of Understanding**
+    - Self-contained by feature
+    - Intuitive file placement
+    - Low learning cost for new developers
 
-2. **保守性**
-    - 機能追加が容易
-    - リファクタリングが局所的
-    - 影響範囲が明確
+2. **Maintainability**
+    - Easy to add features
+    - Refactoring is localized
+    - Impact scope is clear
 
-3. **テスタビリティ**
-    - モックが容易
-    - 単体テストが書きやすい
-    - テストカバレッジを確保しやすい
+3. **Testability**
+    - Easy to mock
+    - Easy to write unit tests
+    - Easy to ensure test coverage
 
-4. **並列開発**
-    - モジュール間の競合が少ない
-    - チーム開発が容易
-    - 責任範囲が明確
+4. **Parallel Development**
+    - Fewer conflicts between modules
+    - Easier team development
+    - Clear responsibility scope
 
-### デメリット
+### Disadvantages
 
-1. **初期移行コスト**
-    - 既存コードの大規模な移動が必要
-    - 一時的な不安定化の可能性
+1. **Initial Migration Cost**
+    - Requires large-scale movement of existing code
+    - Potential for temporary instability
 
-2. **共通機能の重複**
-    - 各モジュールで似たコードが発生する可能性
-    - 共通化のタイミングの判断が必要
+2. **Duplication of Common Features**
+    - Similar code may occur in each module
+    - Need to determine timing for consolidation
 
-## 移行計画
+## Migration Plan
 
-### Phase 1: 準備
-- [ ] 新構造のディレクトリ作成
-- [ ] 共通機能（shared）の整備
-- [ ] 依存性注入の仕組み構築
+### Phase 1: Preparation
+- [ ] Create new directory structure
+- [ ] Prepare common features (shared)
+- [ ] Build dependency injection mechanism
 
-### Phase 2: 段階的移行
-- [ ] 各モジュールの順次移行
+### Phase 2: Gradual Migration
+- [ ] Sequential migration of each module
 
-### Phase 3: クリーンアップ
-- [ ] 旧構造の削除
-- [ ] ドキュメント更新
-- [ ] 最終テスト
+### Phase 3: Cleanup
+- [ ] Delete old structure
+- [ ] Update documentation
+- [ ] Final testing
 
-## 参考資料
+## References
 
 - [Modular Architecture Pattern](https://martinfowler.com/articles/modular-architecture.html)
 - [Feature-Sliced Design](https://feature-sliced.design/)

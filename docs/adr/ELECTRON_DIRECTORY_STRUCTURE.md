@@ -1,147 +1,147 @@
-# ADR: Electron App ディレクトリ構造とレイヤー分離
+# ADR: Electron App Directory Structure and Layer Separation
 
-## ステータス
-承認済み
+## Status
+Accepted
 
-## コンテキスト
-Electron アプリケーションのディレクトリ構造が複雑化し、責務の混在と依存関係の不明確さが保守性を低下させていました。特に以下の問題がありました：
+## Context
+The Electron application's directory structure had become complex, with mixed responsibilities and unclear dependencies that were degrading maintainability. Specifically, the following issues existed:
 
-- フロントエンドコードとバックエンドコードの混在
-- ビジネスロジックの分散
-- 循環依存の可能性
-- テストの困難さ
+- Frontend and backend code were mixed together
+- Business logic was scattered across the codebase
+- Potential for circular dependencies
+- Difficulty in testing
 
-## 決定
-クリーンアーキテクチャの原則に基づき、明確なレイヤー分離を実装します。
+## Decision
+We implement clear layer separation based on Clean Architecture principles.
 
-### 新しいディレクトリ構造
+### New Directory Structure
 
 ```
 apps/electron/src/
-├── main/                    # メインプロセス
-│   ├── modules/            # モジュール層（ビジネスロジック）
-│   │   ├── auth/           # 認証
-│   │   ├── mcp-apps-manager/ # MCPアプリ管理
-│   │   │   └── (mcp-client, token-manager等)
-│   │   ├── mcp-logger/     # MCPログ管理
-│   │   ├── mcp-server-manager/ # MCPサーバー管理
-│   │   │   └── dxt-processor/ # DXTデータ処理
-│   │   ├── mcp-server-runtime/ # MCPサーバーランタイム
-│   │   │   └── http/       # HTTPサーバー
-│   │   ├── settings/       # 設定管理
-│   │   ├── system/         # システム管理
-│   │   ├── workflow/       # ワークフロー・フック管理
-│   │   └── workspace/      # ワークスペース管理
-│   ├── infrastructure/     # インフラストラクチャ層
-│   │   ├── database/       # データベースアクセス
-│   │   └── ipc.ts          # IPC通信
-│   ├── ui/                 # UI関連
-│   │   ├── menu.ts         # メニュー
-│   │   └── tray.ts         # トレイ
-│   └── utils/              # メインプロセス用ユーティリティ
-├── renderer/               # レンダラープロセス
-│   ├── components/         # UIコンポーネント
-│   │   ├── auth/           # 認証UI
-│   │   ├── common/         # 共通コンポーネント
-│   │   ├── layout/         # レイアウト
-│   │   ├── mcp/            # MCP関連UI
-│   │   ├── setting/        # 設定UI
-│   │   ├── workflow/       # ワークフロー・フック管理UI
-│   │   └── workspace/      # ワークスペースUI
+├── main/                    # Main process
+│   ├── modules/            # Module layer (business logic)
+│   │   ├── auth/           # Authentication
+│   │   ├── mcp-apps-manager/ # MCP app management
+│   │   │   └── (mcp-client, token-manager, etc.)
+│   │   ├── mcp-logger/     # MCP log management
+│   │   ├── mcp-server-manager/ # MCP server management
+│   │   │   └── dxt-processor/ # DXT data processing
+│   │   ├── mcp-server-runtime/ # MCP server runtime
+│   │   │   └── http/       # HTTP server
+│   │   ├── settings/       # Settings management
+│   │   ├── system/         # System management
+│   │   ├── workflow/       # Workflow and hook management
+│   │   └── workspace/      # Workspace management
+│   ├── infrastructure/     # Infrastructure layer
+│   │   ├── database/       # Database access
+│   │   └── ipc.ts          # IPC communication
+│   ├── ui/                 # UI-related
+│   │   ├── menu.ts         # Menu
+│   │   └── tray.ts         # Tray
+│   └── utils/              # Main process utilities
+├── renderer/               # Renderer process
+│   ├── components/         # UI components
+│   │   ├── auth/           # Authentication UI
+│   │   ├── common/         # Common components
+│   │   ├── layout/         # Layout
+│   │   ├── mcp/            # MCP-related UI
+│   │   ├── setting/        # Settings UI
+│   │   ├── workflow/       # Workflow and hook management UI
+│   │   └── workspace/      # Workspace UI
 │   ├── platform-api/       # Platform API
-│   ├── services/           # レンダラーサービス
-│   ├── stores/             # 状態管理（Zustand）
-│   └── utils/              # レンダラー用ユーティリティ
-└── types/                  # 型定義
+│   ├── services/           # Renderer services
+│   ├── stores/             # State management (Zustand)
+│   └── utils/              # Renderer utilities
+└── types/                  # Type definitions
 ```
 
-### レイヤーの責務
+### Layer Responsibilities
 
-#### 1. モジュール層 (`main/modules/`)
-- **責務**: ビジネスロジックとビジネスルール、アプリケーション機能
-- **依存**: インフラストラクチャ層に依存
-- **内容**: 
-  - 各機能モジュール（auth, workspace等）
-  - サービスクラス
-  - リポジトリインターフェース
-  - ビジネスルールの実装
+#### 1. Module Layer (`main/modules/`)
+- **Responsibility**: Business logic, business rules, and application features
+- **Dependencies**: Depends on the infrastructure layer
+- **Contents**:
+  - Feature modules (auth, workspace, etc.)
+  - Service classes
+  - Repository interfaces
+  - Business rule implementations
 
-#### 2. インフラストラクチャ層 (`main/infrastructure/`)
-- **責務**: データベースとIPC通信の基盤
-- **依存**: 外部ライブラリのみ
-- **内容**:
-  - データベース基盤
+#### 2. Infrastructure Layer (`main/infrastructure/`)
+- **Responsibility**: Database and IPC communication foundation
+- **Dependencies**: Only external libraries
+- **Contents**:
+  - Database foundation
     - SQLiteManager
     - BaseRepository
-    - マイグレーション管理
-  - IPC通信基盤
+    - Migration management
+  - IPC communication foundation
 
-#### 3. UI層 (`main/ui/`)
-- **責務**: メインプロセス側のUI制御
-- **依存**: Electronフレームワーク
-- **内容**:
-  - メニュー管理
-  - トレイアイコン管理
+#### 3. UI Layer (`main/ui/`)
+- **Responsibility**: Main process-side UI control
+- **Dependencies**: Electron framework
+- **Contents**:
+  - Menu management
+  - Tray icon management
 
-#### 4. レンダラー層 (`renderer/`)
-- **責務**: ユーザーインターフェース
-- **依存**: IPC経由でメインプロセスと通信
-- **内容**:
-  - Reactコンポーネント
-    - Hook管理UI
+#### 4. Renderer Layer (`renderer/`)
+- **Responsibility**: User interface
+- **Dependencies**: Communicates with main process via IPC
+- **Contents**:
+  - React components
+    - Hook management UI
     - MCP Apps UI
-    - Server管理UI
-  - 状態管理（Zustand）
+    - Server management UI
+  - State management (Zustand)
     - hook-store
     - workflow-store
     - theme-store
     - view-preferences-store
-  - Platform API抽象化
-  - UIロジック
+  - Platform API abstraction
+  - UI logic
 
-### インポートルール
+### Import Rules
 
-1. **インフラストラクチャ層** は他のアプリケーションコードに依存しない
-2. **モジュール層** はインフラストラクチャ層に依存可能
-3. **UI層** はElectronフレームワークに依存
-4. **レンダラー層** は直接メインプロセスのコードをインポートしない（IPC経由）
+1. **Infrastructure layer** does not depend on other application code
+2. **Module layer** may depend on the infrastructure layer
+3. **UI layer** depends on the Electron framework
+4. **Renderer layer** does not directly import main process code (uses IPC)
 
-### パスエイリアス
+### Path Aliases
 
-TypeScriptのパスエイリアスを使用して、インポートを明確にします：
+TypeScript path aliases are used to make imports clear:
 
 ```typescript
-// モジュール層
+// Module layer
 import { ServerService } from "@/main/modules/mcp-server-manager/server-service";
 import { WorkspaceService } from "@/main/modules/workspace/workspace-service";
 
-// インフラストラクチャ層
+// Infrastructure layer
 import { BaseRepository } from "@/main/infrastructure/database/base-repository";
 
-// レンダラー層
+// Renderer layer
 import { ServerList } from "@/renderer/components/mcp/ServerList";
 
-// 共有
+// Shared
 import { ServerConfig } from "@/shared/types";
 ```
 
-## 結果
+## Consequences
 
-### 利点
-1. **明確な責務分離**: 各レイヤーの役割が明確
-2. **依存関係の整理**: 依存の方向が一方向に統一
-3. **テスタビリティの向上**: 各レイヤーを独立してテスト可能
-4. **保守性の向上**: 変更の影響範囲が限定的
-5. **拡張性**: 新機能追加時の影響を最小限に
+### Advantages
+1. **Clear separation of responsibilities**: Each layer's role is well-defined
+2. **Organized dependencies**: Dependency direction is unified and unidirectional
+3. **Improved testability**: Each layer can be tested independently
+4. **Improved maintainability**: Impact of changes is limited
+5. **Extensibility**: Minimizes impact when adding new features
 
-### 欠点
-1. **初期の複雑性**: ファイル数とディレクトリ数の増加
-2. **学習曲線**: 新規開発者がアーキテクチャを理解する必要
-3. **ボイラープレート**: レイヤー間の通信にコードが必要
+### Disadvantages
+1. **Initial complexity**: Increased number of files and directories
+2. **Learning curve**: New developers need to understand the architecture
+3. **Boilerplate**: Code needed for inter-layer communication
 
-## 代替案
+## Alternatives Considered
 
-### 1. 機能別ディレクトリ構造
+### 1. Feature-based Directory Structure
 ```
 src/
 ├── features/
@@ -149,26 +149,26 @@ src/
 │   ├── workspace/
 │   └── auth/
 ```
-- **却下理由**: レイヤー間の責務が不明確になる
+- **Reason for rejection**: Responsibilities between layers become unclear
 
-### 2. フラットな構造の維持
-- **却下理由**: 現在の問題が解決されない
+### 2. Maintaining a Flat Structure
+- **Reason for rejection**: Current problems would not be resolved
 
-## 更新履歴
-- **2025年9月**: モジュール層への移行を反映
-  - domain層をmodules層に変更
-  - application層を廃止し、機能をmodules層に統合
-  - 新しいモジュール構成を反映（mcp-apps-manager, mcp-server-manager等）
-  - workflow（フック管理含む）、system、mcp-loggerモジュールを追加
-- **2025年8月**: 実際のディレクトリ構造に合わせて更新
-  - MCP Hook System関連のディレクトリを追加
-  - MCPアプリケーション機能の詳細を追加
-  - スキーマ管理の統一化を反映
-  - 新規追加されたサービスとコンポーネントを記載
+## Update History
+- **September 2025**: Reflected migration to module layer
+  - Changed domain layer to modules layer
+  - Deprecated application layer and integrated its functionality into modules layer
+  - Reflected new module structure (mcp-apps-manager, mcp-server-manager, etc.)
+  - Added workflow (including hook management), system, and mcp-logger modules
+- **August 2025**: Updated to match actual directory structure
+  - Added MCP Hook System-related directories
+  - Added details of MCP application features
+  - Reflected schema management unification
+  - Documented newly added services and components
 
-## 参考文献
+## References
 - [Clean Architecture by Robert C. Martin](https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html)
 - [Domain-Driven Design by Eric Evans](https://www.domainlanguage.com/ddd/)
 - [Electron Best Practices](https://www.electronjs.org/docs/latest/tutorial/security)
-- [DATABASE_ARCHITECTURE.md](./database/DATABASE_ARCHITECTURE.md) - データベースアーキテクチャ
-- [DATABASE_SCHEMA_MANAGEMENT.md](./database/DATABASE_SCHEMA_MANAGEMENT.md) - スキーマ管理戦略
+- [DATABASE_ARCHITECTURE.md](./database/DATABASE_ARCHITECTURE.md) - Database Architecture
+- [DATABASE_SCHEMA_MANAGEMENT.md](./database/DATABASE_SCHEMA_MANAGEMENT.md) - Schema Management Strategy

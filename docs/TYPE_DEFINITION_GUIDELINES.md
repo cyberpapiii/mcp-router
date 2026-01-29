@@ -11,7 +11,7 @@ This document outlines the guidelines for TypeScript type definitions in the MCP
 Types must only be defined in the following directories:
 
 1. **`packages/shared/src/types/`** - Primary location for all shared types
-   - Domain types (MCP, User, Workspaceなど)
+   - Domain types (MCP, User, Workspace, etc.)
    - API types (request/response)
    - Common UI prop patterns
    - Store state types

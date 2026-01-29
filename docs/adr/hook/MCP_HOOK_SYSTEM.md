@@ -6,22 +6,22 @@ Accepted
 
 ## Context
 
-MCP Router は、複数の MCP (Model Context Protocol) サーバーを統合し、単一のエンドポイントとして機能するシステムです。ユーザーから、MCP リクエスト/レスポンスの処理フローにカスタムロジックを挿入したいという要望がありました。
+MCP Router is a system that integrates multiple MCP (Model Context Protocol) servers and functions as a single endpoint. Users requested the ability to insert custom logic into the MCP request/response processing flow.
 
-主な要件：
-- リクエスト送信前（Pre-hook）とレスポンス受信後（Post-hook）の両方でカスタムロジックを実行
-- 条件に基づいてリクエストをフィルタリング、変更、またはブロック
-- ユーザーが JavaScript でロジックを記述可能
-- 安全な実行環境の提供
-- ビジュアルな実行フローの定義
+Main requirements:
+- Execute custom logic both before request sending (Pre-hook) and after response receiving (Post-hook)
+- Filter, modify, or block requests based on conditions
+- Allow users to write logic in JavaScript
+- Provide a secure execution environment
+- Visual execution flow definition
 
 ## Decision
 
-### 1. アーキテクチャパターン
+### 1. Architecture Pattern
 
-**Workflow中心のモジュラーアーキテクチャ**
+**Workflow-Centric Modular Architecture**
 
-Hookは独立したシステムではなく、Workflowシステムのモジュール（ノード）として実装されます。これにより、実行フローの可視化と柔軟な制御が可能になります。
+Hooks are implemented not as an independent system, but as modules (nodes) within the Workflow system. This enables visualization of execution flow and flexible control.
 
 ```
 UI Layer (React)
@@ -37,11 +37,11 @@ Workflow Engine
     └── Hook Script Execution
 ```
 
-### 2. Workflowシステム
+### 2. Workflow System
 
-**ビジュアルプログラミングパラダイム**
+**Visual Programming Paradigm**
 
-React Flowを使用したビジュアルエディタで、ノードをドラッグ&ドロップして処理フローを定義します。
+Using React Flow-based visual editor, users define processing flows by drag-and-drop node placement.
 
 ```typescript
 interface WorkflowDefinition {
@@ -57,9 +57,9 @@ interface WorkflowDefinition {
 }
 ```
 
-### 3. ノードタイプ
+### 3. Node Types
 
-#### 3.1 基本ノード
+#### 3.1 Basic Nodes
 
 ```typescript
 interface WorkflowNode {
@@ -68,46 +68,46 @@ interface WorkflowNode {
   position: { x: number; y: number };
   data: {
     label: string;
-    hook?: WorkflowHook;  // type === 'hook' の場合
+    hook?: WorkflowHook;  // when type === 'hook'
     [key: string]: any;
   };
   deletable?: boolean;
 }
 ```
 
-#### 3.2 Hookノード（モジュール）
+#### 3.2 Hook Node (Module)
 
-Hookはワークフローの一部として、以下の特性を持つモジュールです：
+Hooks are modules that are part of workflows with the following characteristics:
 
 ```typescript
 interface WorkflowHook {
   id: string;
   script: string;      // JavaScript code
-  blocking: boolean;   // true: 同期実行, false: 非同期（Fire & Forget）
+  blocking: boolean;   // true: synchronous execution, false: asynchronous (Fire & Forget)
 }
 ```
 
-**ノードの入出力制約：**
-- **Start Node**: 入力なし、出力複数可
-- **End Node**: 入力1つのみ、出力なし
-- **MCP Call Node**: 入力1つ、出力複数可
-- **Sync Hook** (blocking=true): 入力1つ、出力複数可
-- **Fire-and-forget Hook** (blocking=false): 入力1つ、出力なし
+**Node Input/Output Constraints:**
+- **Start Node**: No input, multiple outputs allowed
+- **End Node**: Single input only, no output
+- **MCP Call Node**: Single input, multiple outputs allowed
+- **Sync Hook** (blocking=true): Single input, multiple outputs allowed
+- **Fire-and-forget Hook** (blocking=false): Single input, no output
 
-### 4. Hook実行環境
+### 4. Hook Execution Environment
 
-**Workflow Engine内でのサンドボックス実行**
+**Sandbox Execution within Workflow Engine**
 
-Hookスクリプトは、Workflow Engineによって管理され、以下の環境で実行されます：
+Hook scripts are managed by the Workflow Engine and executed in the following environment:
 
 ```javascript
 // Hook Context
 {
   request: {
-    method: string,    // MCPメソッド名
-    params: any        // リクエストパラメータ
+    method: string,    // MCP method name
+    params: any        // Request parameters
   },
-  response?: any,      // Post-hookの場合のレスポンス
+  response?: any,      // Response for Post-hook
   metadata: {
     clientId: string,
     serverName?: string,
@@ -117,9 +117,9 @@ Hookスクリプトは、Workflow Engineによって管理され、以下の環�
 }
 ```
 
-### 5. 実行フロー
+### 5. Execution Flow
 
-#### 5.1 Workflow実行順序
+#### 5.1 Workflow Execution Order
 
 ```
 Start → [Pre-hooks] → MCP Call → [Post-hooks] → End
@@ -127,114 +127,114 @@ Start → [Pre-hooks] → MCP Call → [Post-hooks] → End
     [Fire & Forget]            [Fire & Forget]
 ```
 
-#### 5.2 実行順序決定アルゴリズム
+#### 5.2 Execution Order Determination Algorithm
 
-1. **主経路（Main Path）の特定**
-   - Startノードから順次実行
-   - 同期ノードは完了を待つ
-   - 非同期ノードは即座に次へ進む
+1. **Main Path Identification**
+   - Execute sequentially from Start node
+   - Wait for synchronous nodes to complete
+   - Proceed immediately for asynchronous nodes
 
-2. **分岐処理**
-   - Fire-and-forgetノードは並列実行
-   - エラーがあってもメインフローは継続
+2. **Branch Processing**
+   - Fire-and-forget nodes execute in parallel
+   - Main flow continues even if errors occur
 
 ```typescript
 async function executeWorkflow(workflow: WorkflowDefinition, context: Context) {
   const startNode = workflow.nodes.find(n => n.type === 'start');
   let currentNode = startNode;
-  
+
   while (currentNode && currentNode.type !== 'end') {
-    // ノード実行
+    // Node execution
     if (currentNode.type === 'hook') {
       if (currentNode.data.hook?.blocking) {
         await executeHookSync(currentNode.data.hook, context);
       } else {
-        executeHookAsync(currentNode.data.hook, context); // 待たない
+        executeHookAsync(currentNode.data.hook, context); // Don't wait
       }
     } else if (currentNode.type === 'mcp-call') {
       await executeMCPCall(context);
     }
-    
-    // 次のノードへ
+
+    // Move to next node
     const outgoingEdge = workflow.edges.find(e => e.source === currentNode.id);
     currentNode = workflow.nodes.find(n => n.id === outgoingEdge?.target);
   }
 }
 ```
 
-### 6. Visual Editor機能
+### 6. Visual Editor Features
 
-**React Flowベースのエディタ**
+**React Flow-based Editor**
 
-- ドラッグ&ドロップでノード配置
-- ノード間の接続をビジュアルに定義
-- リアルタイムバリデーション
-- Hook script inline編集
+- Drag & drop node placement
+- Visual definition of connections between nodes
+- Real-time validation
+- Inline Hook script editing
 
 ## Consequences
 
 ### Positive
 
-1. **可視性の向上**
-   - 実行フローが一目で理解できる
-   - デバッグが容易
-   - ノンプログラマーでも基本的なフローを理解可能
+1. **Improved Visibility**
+   - Execution flow is understandable at a glance
+   - Easy debugging
+   - Non-programmers can understand basic flows
 
-2. **モジュラー設計**
-   - Hookは再利用可能なモジュール
-   - 新しいノードタイプの追加が容易
-   - 責務の明確な分離
+2. **Modular Design**
+   - Hooks are reusable modules
+   - Easy to add new node types
+   - Clear separation of responsibilities
 
-3. **柔軟性**
-   - 複雑なフローも視覚的に構築可能
-   - 同期/非同期の混在が可能
-   - 条件分岐の将来的な追加が容易
+3. **Flexibility**
+   - Complex flows can be built visually
+   - Mixed synchronous/asynchronous execution possible
+   - Easy to add conditional branching in the future
 
-4. **保守性**
-   - WorkflowはJSONとして保存
-   - バージョン管理が容易
-   - エクスポート/インポートが可能
+4. **Maintainability**
+   - Workflows are saved as JSON
+   - Easy version control
+   - Export/import capability
 
 ### Negative
 
-1. **複雑性の増加**
-   - UIの実装が複雑
-   - ユーザーの学習曲線
+1. **Increased Complexity**
+   - UI implementation is complex
+   - User learning curve
 
-2. **パフォーマンス**
-   - ビジュアルエディタのオーバーヘッド
-   - 大規模なワークフローの描画コスト
+2. **Performance**
+   - Visual editor overhead
+   - Rendering cost for large-scale workflows
 
-3. **制約**
-   - 現在は条件分岐なし（将来的に追加予定）
-   - ループ構造なし（意図的な制限）
+3. **Constraints**
+   - Currently no conditional branching (planned for future)
+   - No loop structures (intentional limitation)
 
 ## Migration Path
 
-### Phase 1: 現在の実装
-- 基本的なWorkflowエディタ
-- Hook、Start、End、MCP Callノード
-- 線形フローのサポート
+### Phase 1: Current Implementation
+- Basic Workflow editor
+- Hook, Start, End, MCP Call nodes
+- Linear flow support
 
-### Phase 2: 将来の拡張
-- 条件分岐ノード
-- 変数/状態管理ノード
-- カスタムノードタイプのプラグイン化
-- Workflowテンプレート/マーケットプレイス
+### Phase 2: Future Extensions
+- Conditional branching nodes
+- Variable/state management nodes
+- Plugin system for custom node types
+- Workflow templates/marketplace
 
 ## Implementation Notes
 
-1. **エラーハンドリング**: 
-   - 同期Hookのエラーはフローを停止
-   - 非同期Hookのエラーはログのみ
+1. **Error Handling**:
+   - Synchronous Hook errors stop the flow
+   - Asynchronous Hook errors are logged only
 
-2. **永続化**: 
-   - WorkflowはJSONとしてローカルストレージに保存
-   - 将来的にはデータベースへ移行
+2. **Persistence**:
+   - Workflows are saved as JSON in local storage
+   - Migration to database planned for the future
 
-3. **実行モニタリング**:
-   - 各ノードの実行状態を可視化
-   - 実行時間の計測とボトルネック特定
+3. **Execution Monitoring**:
+   - Visualize execution state of each node
+   - Measure execution time and identify bottlenecks
 
 ## References
 

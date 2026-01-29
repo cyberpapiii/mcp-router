@@ -1,41 +1,41 @@
-# 新機能追加チェックリスト
+# New Feature Addition Checklist
 
-本ドキュメントは、MCP Routerに新機能（特にService/Repositoryを伴う機能）を追加する際に、見落としやすいポイントをまとめたものです。
+This document summarizes points that are easy to overlook when adding new features (especially those involving Service/Repository) to MCP Router.
 
-## チェックリスト
+## Checklist
 
-### 1. Singletonパターンの登録（必須）
+### 1. Singleton Pattern Registration (Required)
 
-Service/Repositoryを追加した場合、ワークスペース切り替え時にインスタンスをリセットする必要があります。
+When adding a Service/Repository, you need to reset the instance when switching workspaces.
 
-**ファイル:** `apps/electron/src/main/modules/workspace/platform-api-manager.ts`
+**File:** `apps/electron/src/main/modules/workspace/platform-api-manager.ts`
 
-**`configureForWorkspace`メソッド内に追加:**
+**Add to the `configureForWorkspace` method:**
 
 ```typescript
-// リポジトリをリセット（新しいデータベースを使用するように）
+// Reset repositories (to use the new database)
 McpLoggerRepository.resetInstance();
-// ... 他のリポジトリ
-YourNewRepository.resetInstance();  // ← 追加
+// ... other repositories
+YourNewRepository.resetInstance();  // <- Add
 
-// サービスのシングルトンインスタンスもリセット
+// Also reset service singleton instances
 ServerService.resetInstance();
-// ... 他のサービス
-YourNewService.resetInstance();  // ← 追加
+// ... other services
+YourNewService.resetInstance();  // <- Add
 ```
 
-**確認ポイント:**
-- [ ] Repositoryの`resetInstance()`を追加したか
-- [ ] Serviceの`resetInstance()`を追加したか
-- [ ] 必要なimport文を追加したか
+**Verification Points:**
+- [ ] Added `resetInstance()` for Repository
+- [ ] Added `resetInstance()` for Service
+- [ ] Added necessary import statements
 
 ---
 
-### 2. 型定義の完全性（必須）
+### 2. Type Definition Completeness (Required)
 
-#### 2.1 エンティティ型定義
+#### 2.1 Entity Type Definitions
 
-**ファイル:** `packages/shared/src/types/xxx-types.ts`（新規作成）
+**File:** `packages/shared/src/types/xxx-types.ts` (create new)
 
 ```typescript
 export interface YourEntity {
@@ -53,9 +53,9 @@ export interface UpdateYourEntityInput {
 }
 ```
 
-#### 2.2 API インターフェース
+#### 2.2 API Interface
 
-**ファイル:** `packages/shared/src/types/platform-api/domains/xxx-api.ts`（新規作成）
+**File:** `packages/shared/src/types/platform-api/domains/xxx-api.ts` (create new)
 
 ```typescript
 import type { YourEntity, CreateYourEntityInput, UpdateYourEntityInput } from "../../xxx-types";
@@ -69,35 +69,35 @@ export interface YourAPI {
 }
 ```
 
-#### 2.3 PlatformAPIへの追加
+#### 2.3 Adding to PlatformAPI
 
-**ファイル:** `packages/shared/src/types/platform-api/platform-api.ts`
+**File:** `packages/shared/src/types/platform-api/platform-api.ts`
 
 ```typescript
 import { YourAPI } from "./domains/xxx-api";
 
 export interface PlatformAPI {
-  // ... 既存のAPI
-  yourFeature: YourAPI;  // ← 追加
+  // ... existing APIs
+  yourFeature: YourAPI;  // <- Add
 }
 ```
 
-#### 2.4 エクスポートの追加
+#### 2.4 Adding Exports
 
-**ファイル:** `packages/shared/src/types/platform-api/index.ts`
+**File:** `packages/shared/src/types/platform-api/index.ts`
 ```typescript
 export * from "./domains/xxx-api";
 ```
 
-**ファイル:** `packages/shared/src/types/index.ts`
+**File:** `packages/shared/src/types/index.ts`
 ```typescript
 export { YourAPI } from "./platform-api";
 export * from "./xxx-types";
 ```
 
-#### 2.5 global.d.ts への型定義追加（重要）
+#### 2.5 Adding Type Definitions to global.d.ts (Important)
 
-**ファイル:** `apps/electron/src/global.d.ts`
+**File:** `apps/electron/src/global.d.ts`
 
 ```typescript
 import type { YourEntity, CreateYourEntityInput, UpdateYourEntityInput } from "@mcp_router/shared";
@@ -105,7 +105,7 @@ import type { YourEntity, CreateYourEntityInput, UpdateYourEntityInput } from "@
 declare global {
   interface Window {
     electronAPI: {
-      // ... 既存の定義
+      // ... existing definitions
 
       // Your Feature Management
       listYourEntities: () => Promise<YourEntity[]>;
@@ -118,20 +118,20 @@ declare global {
 }
 ```
 
-**確認ポイント:**
-- [ ] エンティティ型を定義したか
-- [ ] APIインターフェースを定義したか
-- [ ] PlatformAPIに追加したか
-- [ ] すべてのエクスポートを追加したか
-- [ ] **global.d.tsに型定義を追加したか**（見落としやすい）
+**Verification Points:**
+- [ ] Defined entity types
+- [ ] Defined API interface
+- [ ] Added to PlatformAPI
+- [ ] Added all exports
+- [ ] **Added type definitions to global.d.ts** (easy to overlook)
 
 ---
 
-### 3. IPC/Preload/PlatformAPI の3層実装（必須）
+### 3. IPC/Preload/PlatformAPI 3-Layer Implementation (Required)
 
-#### 3.1 IPCハンドラ
+#### 3.1 IPC Handler
 
-**ファイル:** `apps/electron/src/main/modules/xxx/xxx.ipc.ts`（新規作成）
+**File:** `apps/electron/src/main/modules/xxx/xxx.ipc.ts` (create new)
 
 ```typescript
 import { ipcMain } from "electron";
@@ -148,32 +148,32 @@ export function setupYourHandlers(): void {
     if (!id) throw new Error("Missing id");
     return service.get(id);
   });
-  // ... 他のハンドラ
+  // ... other handlers
 }
 ```
 
-#### 3.2 IPC登録
+#### 3.2 IPC Registration
 
-**ファイル:** `apps/electron/src/main/infrastructure/ipc.ts`
+**File:** `apps/electron/src/main/infrastructure/ipc.ts`
 
 ```typescript
 import { setupYourHandlers } from "../modules/xxx/xxx.ipc";
 
 export function setupIpcHandlers(deps: { ... }): void {
-  // ... 既存のハンドラ
-  setupYourHandlers();  // ← 追加
+  // ... existing handlers
+  setupYourHandlers();  // <- Add
 }
 ```
 
 #### 3.3 Preload
 
-**ファイル:** `apps/electron/src/preload.ts`
+**File:** `apps/electron/src/preload.ts`
 
 ```typescript
 import type { CreateYourEntityInput, UpdateYourEntityInput } from "@mcp_router/shared";
 
 contextBridge.exposeInMainWorld("electronAPI", {
-  // ... 既存のAPI
+  // ... existing APIs
 
   // Your Feature Management
   listYourEntities: () => ipcRenderer.invoke("xxx:list"),
@@ -187,7 +187,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
 #### 3.4 Electron Platform API
 
-**ファイル:** `apps/electron/src/renderer/platform-api/electron-platform-api.ts`
+**File:** `apps/electron/src/renderer/platform-api/electron-platform-api.ts`
 
 ```typescript
 import type { YourAPI } from "@mcp_router/shared";
@@ -196,7 +196,7 @@ class ElectronPlatformAPI implements PlatformAPI {
   yourFeature: YourAPI;
 
   constructor() {
-    // ... 既存の初期化
+    // ... existing initialization
 
     // Initialize your feature domain
     this.yourFeature = {
@@ -212,11 +212,11 @@ class ElectronPlatformAPI implements PlatformAPI {
 
 #### 3.5 Remote Platform API
 
-**ファイル:** `apps/electron/src/renderer/platform-api/remote-platform-api.ts`
+**File:** `apps/electron/src/renderer/platform-api/remote-platform-api.ts`
 
 ```typescript
 export class RemotePlatformAPI implements PlatformAPI {
-  // ... 既存のgetter
+  // ... existing getters
 
   get yourFeature() {
     return this.localPlatformAPI.yourFeature;
@@ -224,42 +224,42 @@ export class RemotePlatformAPI implements PlatformAPI {
 }
 ```
 
-**確認ポイント:**
-- [ ] IPCハンドラを作成したか
-- [ ] `ipc.ts`に登録したか
-- [ ] `preload.ts`に追加したか
-- [ ] `electron-platform-api.ts`に実装したか
-- [ ] `remote-platform-api.ts`にgetterを追加したか
+**Verification Points:**
+- [ ] Created IPC handler
+- [ ] Registered in `ipc.ts`
+- [ ] Added to `preload.ts`
+- [ ] Implemented in `electron-platform-api.ts`
+- [ ] Added getter to `remote-platform-api.ts`
 
 ---
 
-### 4. 初期化処理（該当する場合）
+### 4. Initialization Processing (If Applicable)
 
-起動時に実行する必要がある処理がある場合、`main.ts`または関連する初期化関数で呼び出します。
+If there is processing that needs to run at startup, call it in `main.ts` or the relevant initialization function.
 
-**ファイル:** `apps/electron/src/main.ts`
+**File:** `apps/electron/src/main.ts`
 
 ```typescript
 async function initMCPServices(): Promise<void> {
-  // ... 既存の初期化
+  // ... existing initialization
 
   // Your feature initialization
-  getYourService().initialize();  // ← 追加（必要な場合）
+  getYourService().initialize();  // <- Add (if needed)
 }
 ```
 
-**確認ポイント:**
-- [ ] 起動時初期化が必要な処理を特定したか
-- [ ] 適切な初期化関数内で呼び出したか
-- [ ] ADRドキュメントに記載した初期化処理が実装されているか
+**Verification Points:**
+- [ ] Identified processes that require startup initialization
+- [ ] Called within the appropriate initialization function
+- [ ] Initialization processes described in ADR documentation are implemented
 
 ---
 
-### 5. 翻訳ファイル（UI機能の場合）
+### 5. Translation Files (For UI Features)
 
-すべての言語ファイルに翻訳キーを追加します。
+Add translation keys to all language files.
 
-**ファイル:**
+**Files:**
 - `apps/electron/src/locales/en.json`
 - `apps/electron/src/locales/ja.json`
 - `apps/electron/src/locales/zh.json`
@@ -278,19 +278,19 @@ async function initMCPServices(): Promise<void> {
 }
 ```
 
-**確認ポイント:**
-- [ ] en.json に追加したか
-- [ ] ja.json に追加したか
-- [ ] zh.json に追加したか
-- [ ] 未使用になった翻訳キーを削除したか
+**Verification Points:**
+- [ ] Added to en.json
+- [ ] Added to ja.json
+- [ ] Added to zh.json
+- [ ] Removed unused translation keys
 
 ---
 
-### 6. UI統合（UI機能の場合）
+### 6. UI Integration (For UI Features)
 
-#### 6.1 ルート追加
+#### 6.1 Route Addition
 
-**ファイル:** `apps/electron/src/renderer/components/App.tsx`
+**File:** `apps/electron/src/renderer/components/App.tsx`
 
 ```tsx
 import YourFeatureManager from "./your-feature/YourFeatureManager";
@@ -298,9 +298,9 @@ import YourFeatureManager from "./your-feature/YourFeatureManager";
 <Route path="/your-feature" element={<YourFeatureManager />} />
 ```
 
-#### 6.2 サイドバーメニュー追加
+#### 6.2 Sidebar Menu Addition
 
-**ファイル:** `apps/electron/src/renderer/components/Sidebar.tsx`
+**File:** `apps/electron/src/renderer/components/Sidebar.tsx`
 
 ```tsx
 <SidebarMenuItem>
@@ -317,59 +317,59 @@ import YourFeatureManager from "./your-feature/YourFeatureManager";
 </SidebarMenuItem>
 ```
 
-**確認ポイント:**
-- [ ] App.tsxにルートを追加したか
-- [ ] Sidebar.tsxにメニューを追加したか
-- [ ] リモートワークスペースで非表示にする必要があるか確認したか
+**Verification Points:**
+- [ ] Added route to App.tsx
+- [ ] Added menu to Sidebar.tsx
+- [ ] Confirmed whether it needs to be hidden for remote workspaces
 
 ---
 
-### 7. ドキュメント（推奨）
+### 7. Documentation (Recommended)
 
-#### 7.1 ADRドキュメント
+#### 7.1 ADR Documentation
 
-**ファイル:** `docs/adr/your-feature/YOUR_FEATURE_DESIGN.md`
+**File:** `docs/adr/your-feature/YOUR_FEATURE_DESIGN.md`
 
-設計決定、アーキテクチャ、主要な実装詳細を記載します。
+Document design decisions, architecture, and key implementation details.
 
-**確認ポイント:**
-- [ ] 設計ドキュメントを作成したか
-- [ ] 実装が設計ドキュメントと一致しているか
+**Verification Points:**
+- [ ] Created design documentation
+- [ ] Implementation matches design documentation
 
 ---
 
-## クイックリファレンス
+## Quick Reference
 
-### 新機能追加時に変更が必要なファイル一覧
+### List of Files to Modify When Adding New Features
 
-| カテゴリ | ファイル | 追加内容 |
+| Category | File | Content to Add |
 |---------|---------|----------|
-| 型定義 | `packages/shared/src/types/xxx-types.ts` | エンティティ型 |
-| 型定義 | `packages/shared/src/types/platform-api/domains/xxx-api.ts` | APIインターフェース |
-| 型定義 | `packages/shared/src/types/platform-api/platform-api.ts` | PlatformAPIへの追加 |
-| 型定義 | `packages/shared/src/types/platform-api/index.ts` | エクスポート |
-| 型定義 | `packages/shared/src/types/index.ts` | エクスポート |
-| 型定義 | `apps/electron/src/global.d.ts` | Window.electronAPI型 |
-| Backend | `apps/electron/src/main/modules/xxx/xxx.service.ts` | サービス |
-| Backend | `apps/electron/src/main/modules/xxx/xxx.repository.ts` | リポジトリ |
-| Backend | `apps/electron/src/main/modules/xxx/xxx.ipc.ts` | IPCハンドラ |
-| Backend | `apps/electron/src/main/infrastructure/ipc.ts` | IPC登録 |
-| Backend | `apps/electron/src/main/modules/workspace/platform-api-manager.ts` | resetInstance登録 |
-| Bridge | `apps/electron/src/preload.ts` | IPC公開 |
-| Frontend | `apps/electron/src/renderer/platform-api/electron-platform-api.ts` | API実装 |
-| Frontend | `apps/electron/src/renderer/platform-api/remote-platform-api.ts` | getter追加 |
-| Frontend | `apps/electron/src/renderer/components/xxx/XxxManager.tsx` | UIコンポーネント |
-| Frontend | `apps/electron/src/renderer/components/App.tsx` | ルート追加 |
-| Frontend | `apps/electron/src/renderer/components/Sidebar.tsx` | メニュー追加 |
-| i18n | `apps/electron/src/locales/en.json` | 英語翻訳 |
-| i18n | `apps/electron/src/locales/ja.json` | 日本語翻訳 |
-| i18n | `apps/electron/src/locales/zh.json` | 中国語翻訳 |
-| Docs | `docs/adr/xxx/XXX_DESIGN.md` | 設計ドキュメント |
+| Types | `packages/shared/src/types/xxx-types.ts` | Entity types |
+| Types | `packages/shared/src/types/platform-api/domains/xxx-api.ts` | API interface |
+| Types | `packages/shared/src/types/platform-api/platform-api.ts` | Addition to PlatformAPI |
+| Types | `packages/shared/src/types/platform-api/index.ts` | Export |
+| Types | `packages/shared/src/types/index.ts` | Export |
+| Types | `apps/electron/src/global.d.ts` | Window.electronAPI types |
+| Backend | `apps/electron/src/main/modules/xxx/xxx.service.ts` | Service |
+| Backend | `apps/electron/src/main/modules/xxx/xxx.repository.ts` | Repository |
+| Backend | `apps/electron/src/main/modules/xxx/xxx.ipc.ts` | IPC handler |
+| Backend | `apps/electron/src/main/infrastructure/ipc.ts` | IPC registration |
+| Backend | `apps/electron/src/main/modules/workspace/platform-api-manager.ts` | resetInstance registration |
+| Bridge | `apps/electron/src/preload.ts` | IPC exposure |
+| Frontend | `apps/electron/src/renderer/platform-api/electron-platform-api.ts` | API implementation |
+| Frontend | `apps/electron/src/renderer/platform-api/remote-platform-api.ts` | Getter addition |
+| Frontend | `apps/electron/src/renderer/components/xxx/XxxManager.tsx` | UI component |
+| Frontend | `apps/electron/src/renderer/components/App.tsx` | Route addition |
+| Frontend | `apps/electron/src/renderer/components/Sidebar.tsx` | Menu addition |
+| i18n | `apps/electron/src/locales/en.json` | English translation |
+| i18n | `apps/electron/src/locales/ja.json` | Japanese translation |
+| i18n | `apps/electron/src/locales/zh.json` | Chinese translation |
+| Docs | `docs/adr/xxx/XXX_DESIGN.md` | Design documentation |
 
 ---
 
-## 関連ドキュメント
+## Related Documentation
 
-- [Platform API アーキテクチャ](./adr/PLATFORM_API.md)
-- [データベース設計パターン](./adr/database/DATABASE_DESIGN_PATTERNS.md)
-- [型定義ガイドライン](./TYPE_DEFINITION_GUIDELINES.md)
+- [Platform API Architecture](./adr/PLATFORM_API.md)
+- [Database Design Patterns](./adr/database/DATABASE_DESIGN_PATTERNS.md)
+- [Type Definition Guidelines](./TYPE_DEFINITION_GUIDELINES.md)

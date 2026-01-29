@@ -1,78 +1,78 @@
-1. OAuth/認証トークンの脆弱性（緊急）
+1. OAuth/Authentication Token Vulnerabilities (Critical)
 
-- apps/electron/src/main/modules/auth/auth.service.ts:94 — handleAuthToken のステート検証を厳格化（state/currentAuthState未設定時は拒否）。引数名もcodeへ明確化。
-- apps/electron/src/main/modules/auth/auth.service.ts:223 — getDecryptedAuthToken は平文返却。実際に暗号化実装へ変更、もしくは関数名/仕様の整合。
-- apps/electron/src/main/modules/auth/auth.service.ts:255 — status() が token を返すのを停止（レンダラーへトークン渡さない）。
-- apps/electron/src/main/modules/auth/auth.ipc.ts:22 — auth:status の返り値からトークン等の秘匿情報排除。認可チェックの導入。
-- apps/electron/src/main/modules/auth/auth.ipc.ts:36 — auth:handle-token 呼出し元検証/レート制限/再入防止。
-- apps/electron/src/main/modules/workspace/workspace.ipc.ts:50 — workspace:get-credentials の廃止か認可ガード（UIへ資格情報を出さない）。
-- apps/electron/src/main/infrastructure/shared-config-manager.ts:104 — 設定保存（saveConfig）で平文保存→安全保管（OS Keychain/Keytarや暗号化+安全な鍵管理）。
-- apps/electron/src/preload.ts:160 — getWorkspaceCredentials や onAuthStatusChanged の露出内容見直し（秘匿情報を橋渡ししない）。
-- apps/electron/src/main.ts:444 — handleProtocolUrl の受け取る mcpr:// URL を用途限定で厳格パース（認証フロー以外は拒否）。
+- apps/electron/src/main/modules/auth/auth.service.ts:94 — Strengthen state validation in handleAuthToken (reject when state/currentAuthState is not set). Also clarify argument name to code.
+- apps/electron/src/main/modules/auth/auth.service.ts:223 — getDecryptedAuthToken returns plaintext. Change to actual encryption implementation, or align function name/specification.
+- apps/electron/src/main/modules/auth/auth.service.ts:255 — Stop status() from returning token (don't pass token to renderer).
+- apps/electron/src/main/modules/auth/auth.ipc.ts:22 — Exclude sensitive information like tokens from auth:status return value. Introduce authorization checks.
+- apps/electron/src/main/modules/auth/auth.ipc.ts:36 — Add caller verification/rate limiting/reentrancy prevention for auth:handle-token.
+- apps/electron/src/main/modules/workspace/workspace.ipc.ts:50 — Deprecate workspace:get-credentials or add authorization guard (don't expose credentials to UI).
+- apps/electron/src/main/infrastructure/shared-config-manager.ts:104 — Change from plaintext storage in saveConfig to secure storage (OS Keychain/Keytar or encryption + secure key management).
+- apps/electron/src/preload.ts:160 — Review exposed content of getWorkspaceCredentials and onAuthStatusChanged (don't bridge sensitive information).
+- apps/electron/src/main.ts:444 — Strictly parse mcpr:// URLs received by handleProtocolUrl with limited use cases (reject non-authentication flows).
 
-2. SSRF（URLインジェクション）（緊急）
+2. SSRF (URL Injection) (Critical)
 
-- apps/electron/src/main/utils/fetch-utils.ts:28 — http/https 始まりの任意URL許容を廃止。許可リストベースのベースURL連結のみ許可。
-- apps/electron/src/main/modules/mcp-apps-manager/mcp-client.ts:50 — new URL(server.remoteUrl) の前にスキーム/ホスト/パス検証（https限定、内部/ローカル禁止等）。
-- apps/electron/src/main/modules/mcp-apps-manager/mcp-client.ts:81 — SSEの remoteUrl も同様に検証。
-- apps/electron/src/main/modules/workspace/platform-api-manager.ts:208 — remoteConfig.apiUrl を採用する前に保存時/読取時の検証（許可ドメイン/スキーム）。
-- apps/electron/src/main/modules/mcp-server-manager/mcp-server-manager.ipc.ts:26 — 追加/更新時に remoteUrl/bearerToken の厳格バリデーション（プロトコル、ポート、プライベートアドレス禁止）。
-- apps/electron/src/main/modules/system/system-handler.ts:30 — フィードバック送信先は固定のみ許可。将来の設定化時は厳格バリデーション。
+- apps/electron/src/main/utils/fetch-utils.ts:28 — Deprecate allowing arbitrary URLs starting with http/https. Only allow allowlist-based base URL concatenation.
+- apps/electron/src/main/modules/mcp-apps-manager/mcp-client.ts:50 — Validate scheme/host/path before new URL(server.remoteUrl) (https only, prohibit internal/local, etc.).
+- apps/electron/src/main/modules/mcp-apps-manager/mcp-client.ts:81 — Similarly validate remoteUrl for SSE.
+- apps/electron/src/main/modules/workspace/platform-api-manager.ts:208 — Validate remoteConfig.apiUrl at save/read time before adoption (allowed domains/schemes).
+- apps/electron/src/main/modules/mcp-server-manager/mcp-server-manager.ipc.ts:26 — Strict validation of remoteUrl/bearerToken during add/update (protocol, port, prohibit private addresses).
+- apps/electron/src/main/modules/system/system-handler.ts:30 — Only allow fixed feedback submission destinations. Strict validation if made configurable in the future.
 
-3. トークン管理/アクセス制御バイパス（緊急）
+3. Token Management/Access Control Bypass (Critical)
 
-- apps/electron/src/main/modules/mcp-apps-manager/token-manager.ts:46 — validateToken に有効期限・失効・スコープ検証を追加。
-- apps/electron/src/main/modules/mcp-apps-manager/token-manager.ts:13 — 生成トークンへ expiresAt 等の期限/ローテーション属性付与。
-- apps/electron/src/main/modules/mcp-server-manager/server-service.ts:41 — 新規サーバー時に全トークンへ自動許可付与を削除（明示的許可フローへ）。
-- apps/electron/src/main/infrastructure/shared-config-manager.ts:351 — syncTokensWithWorkspaceServers による一括許可付与の廃止/同意ベース。
-- apps/electron/src/main/infrastructure/shared-config-manager.ts:222 — マイグレーション時「全サーバー付与」を廃止（最小権限での移行）。
-- apps/electron/src/main/modules/mcp-server-manager/mcp-server-manager.ipc.ts:9 — 開始/停止/更新系IPCに認可チェック導入。
+- apps/electron/src/main/modules/mcp-apps-manager/token-manager.ts:46 — Add expiration/revocation/scope validation to validateToken.
+- apps/electron/src/main/modules/mcp-apps-manager/token-manager.ts:13 — Add expiration/rotation attributes like expiresAt to generated tokens.
+- apps/electron/src/main/modules/mcp-server-manager/server-service.ts:41 — Remove automatic permission granting to all tokens for new servers (change to explicit permission flow).
+- apps/electron/src/main/infrastructure/shared-config-manager.ts:351 — Deprecate batch permission granting via syncTokensWithWorkspaceServers / change to consent-based.
+- apps/electron/src/main/infrastructure/shared-config-manager.ts:222 — Deprecate "grant all servers" during migration (migrate with least privilege).
+- apps/electron/src/main/modules/mcp-server-manager/mcp-server-manager.ipc.ts:9 — Introduce authorization checks for start/stop/update IPCs.
 
-4. パス・トラバーサル/FSアクセス（緊急）
+4. Path Traversal/FS Access (Critical)
 
-- apps/electron/src/main/utils/uri-utils.ts:10 — parseResourceUri の path に ../スキーム混入を許さない正規化/検証。
-- apps/electron/src/main/modules/mcp-server-runtime/request-handlers.ts:435 — readResourceByUri で createUriVariants に生のパスを渡す前に許可スキーム/サーバ側制約を適用。
-- apps/electron/src/main/modules/mcp-server-manager/dxt-processor/dxt-processor.ts:45 — unpackExtension 抽出先の脱出防止（Zip Slip対策、展開先検証）。
-- apps/electron/src/main/modules/mcp-server-manager/dxt-processor/dxt-converter.ts:162 — パス変数展開後に正規化と許可ディレクトリ外排除。
-- apps/electron/src/main/modules/mcp-server-manager/mcp-server-manager.ipc.ts:91 — server:selectFile の受け入れ制限（mode/filters強制、パス検証）。
-- apps/electron/src/main/modules/workspace/workspace.service.ts:432 — databasePath をユーザー入力にさせない/正規化（トラバーサル拒否）。
-- apps/electron/src/main/infrastructure/database/sqlite-manager.ts:17 — 相対入力時のパス合成で正規化と検査（.. 排除）。
+- apps/electron/src/main/utils/uri-utils.ts:10 — Normalize/validate path in parseResourceUri to prevent ../ scheme injection.
+- apps/electron/src/main/modules/mcp-server-runtime/request-handlers.ts:435 — Apply allowed scheme/server-side constraints before passing raw paths to createUriVariants in readResourceByUri.
+- apps/electron/src/main/modules/mcp-server-manager/dxt-processor/dxt-processor.ts:45 — Prevent extraction escape in unpackExtension (Zip Slip countermeasures, extraction destination validation).
+- apps/electron/src/main/modules/mcp-server-manager/dxt-processor/dxt-converter.ts:162 — Normalize and exclude paths outside allowed directories after path variable expansion.
+- apps/electron/src/main/modules/mcp-server-manager/mcp-server-manager.ipc.ts:91 — Restrict acceptance of server:selectFile (enforce mode/filters, path validation).
+- apps/electron/src/main/modules/workspace/workspace.service.ts:432 — Don't allow user input for databasePath / normalize (reject traversal).
+- apps/electron/src/main/infrastructure/database/sqlite-manager.ts:17 — Normalize and check path composition on relative input (exclude ..).
 
-5. フック/ワークフロー経由の任意コード実行（緊急）
+5. Arbitrary Code Execution via Hooks/Workflows (Critical)
 
-- apps/electron/src/main/modules/workflow/hook.service.ts:206 — vm.runInContext サンドボックス強化（Object/Array/Pipelineの凍結、require/プロセス遮断、I/O禁止）。
-- apps/electron/src/main/modules/workflow/hook.ipc.ts:10 — 作成/更新/実行IPCに厳格バリデーションと認可（管理者のみ等）。
-- apps/electron/src/main/modules/workflow/workflow.ipc.ts:10 — 同上（有効化/実行時の検証）。
-- apps/electron/src/main/modules/mcp-server-runtime/request-handler-base.ts:39 — ワークフロー実行コンテキストからトークン/機密除去、またはダミー化。
-- apps/electron/src/main/modules/workflow/workflow.repository.ts:... — 保存前のスクリプト検証/署名/サイズ上限等の防御策。
+- apps/electron/src/main/modules/workflow/hook.service.ts:206 — Strengthen vm.runInContext sandbox (freeze Object/Array/Pipeline, block require/process, prohibit I/O).
+- apps/electron/src/main/modules/workflow/hook.ipc.ts:10 — Strict validation and authorization for create/update/execute IPCs (admin only, etc.).
+- apps/electron/src/main/modules/workflow/workflow.ipc.ts:10 — Same as above (validation during enable/execute).
+- apps/electron/src/main/modules/mcp-server-runtime/request-handler-base.ts:39 — Remove or dummy tokens/sensitive data from workflow execution context.
+- apps/electron/src/main/modules/workflow/workflow.repository.ts:... — Defense measures such as script validation/signing/size limits before saving.
 
-6. 機密データの平文保存（緊急）
+6. Plaintext Storage of Sensitive Data (Critical)
 
-- apps/electron/src/main/modules/mcp-server-manager/mcp-server-manager.repository.ts:235 — bearer_token を暗号化保存（Keytar等、KMSが望ましい）。
-- apps/electron/src/main/infrastructure/shared-config-manager.ts:116 — settings.authToken 等をファイルへ平文保存しない（安全保管へ移行）。
-- apps/electron/src/main/modules/workspace/workspace.repository.ts:160 — Base64疑似「暗号化」を廃止。真正な暗号化＋鍵管理に変更。
-- apps/electron/src/main/modules/mcp-logger/mcp-logger.repository.ts:146 — request_params/response_data に秘匿情報混入を除去/マスキング、必要最小限のみ保存。
-- apps/electron/src/renderer/stores/auth-store.ts:122 — レンダラー状態に authToken を保持しない（必要時のみ一時メモリ、極力メイン側処理）。
+- apps/electron/src/main/modules/mcp-server-manager/mcp-server-manager.repository.ts:235 — Encrypt bearer_token storage (Keytar, KMS preferred).
+- apps/electron/src/main/infrastructure/shared-config-manager.ts:116 — Don't store settings.authToken etc. as plaintext to file (migrate to secure storage).
+- apps/electron/src/main/modules/workspace/workspace.repository.ts:160 — Deprecate Base64 pseudo "encryption". Change to genuine encryption + key management.
+- apps/electron/src/main/modules/mcp-logger/mcp-logger.repository.ts:146 — Remove/mask sensitive information mixed into request_params/response_data, store only minimum necessary.
+- apps/electron/src/renderer/stores/auth-store.ts:122 — Don't hold authToken in renderer state (temporary memory only when needed, prefer main-side processing).
 
-7. HTTPサーバー入力処理（高）
+7. HTTP Server Input Processing (High)
 
-- apps/electron/src/main/modules/mcp-server-runtime/http/mcp-http-server.ts:56 — Bearerトークン処理の二重/不整合を統一（前処理/後処理の一本化）。
-- apps/electron/src/main/modules/mcp-server-runtime/http/mcp-http-server.ts:110 — resolveProjectFilter の検証強化（フォーマット/長さ/存在確認、remoteでも検証をスキップしない）。
-- apps/electron/src/main/modules/mcp-server-runtime/http/mcp-http-server.ts:47 — cors() を許可オリジン限定へ。express.json({limit}) でサイズ制限。
-- apps/electron/src/main/modules/mcp-server-runtime/http/mcp-http-server.ts:390 — listen(port) を listen(port, '127.0.0.1') へ（ローカルバインド）。TLS導入も検討。
-- apps/electron/src/main/modules/mcp-server-runtime/http/mcp-http-server.ts:145 — _meta.token 付与を廃止/最小化（下流/ログへ秘匿情報を流さない）。
+- apps/electron/src/main/modules/mcp-server-runtime/http/mcp-http-server.ts:56 — Unify dual/inconsistent Bearer token processing (consolidate pre/post processing).
+- apps/electron/src/main/modules/mcp-server-runtime/http/mcp-http-server.ts:110 — Strengthen resolveProjectFilter validation (format/length/existence check, don't skip validation even for remote).
+- apps/electron/src/main/modules/mcp-server-runtime/http/mcp-http-server.ts:47 — Limit cors() to allowed origins. Add size limit with express.json({limit}).
+- apps/electron/src/main/modules/mcp-server-runtime/http/mcp-http-server.ts:390 — Change listen(port) to listen(port, '127.0.0.1') (local bind). Also consider TLS introduction.
+- apps/electron/src/main/modules/mcp-server-runtime/http/mcp-http-server.ts:145 — Deprecate/minimize _meta.token assignment (don't flow sensitive information to downstream/logs).
 
-8. ワークフローのDoS/情報漏洩（高）
+8. Workflow DoS/Information Leakage (High)
 
-- apps/electron/src/main/modules/workflow/workflow-executor.ts:210 — グラフ検証を強化（サイクル検出の堅牢化、ノード/エッジ上限、タイムアウト/ステップ制限）。
-- apps/electron/src/main/modules/workflow/hook.service.ts:206 — フックスクリプトのCPU/メモリ消費制限、実行回数・最大出力制限。
-- apps/electron/src/main/modules/mcp-server-runtime/request-handler-base.ts:39 — コンテキスト/ログから機密情報を除去（最小限メタのみ）。
-- apps/electron/src/main/modules/workflow/workflow.service.ts:119 — 有効化時の検証を厳格化（構造/負荷/権限チェックを必須化）。
+- apps/electron/src/main/modules/workflow/workflow-executor.ts:210 — Strengthen graph validation (robust cycle detection, node/edge limits, timeout/step limits).
+- apps/electron/src/main/modules/workflow/hook.service.ts:206 — Limit hook script CPU/memory consumption, execution count, and maximum output.
+- apps/electron/src/main/modules/mcp-server-runtime/request-handler-base.ts:39 — Remove sensitive information from context/logs (minimum meta only).
+- apps/electron/src/main/modules/workflow/workflow.service.ts:119 — Strengthen validation during activation (make structure/load/permission checks mandatory).
 
-補足（推奨の横断対応）
+Supplementary (Recommended Cross-Cutting Measures)
 
-- apps/electron/src/main.ts:295 — CSPは本番で unsafe-eval/unsafe-inline を禁止。開発時のみ緩める。
-- apps/electron/src/renderer/components/mcp/apps/McpAppsManager.tsx:303 — dangerouslySetInnerHTML の除去か厳格サニタイズ（XSS対策）。
-- 全IPCに入力スキーマ検証（zod等）と認可ガード、レート制限を導入。ログは秘匿情報を常時マスク。
+- apps/electron/src/main.ts:295 — CSP should prohibit unsafe-eval/unsafe-inline in production. Relax only during development.
+- apps/electron/src/renderer/components/mcp/apps/McpAppsManager.tsx:303 — Remove dangerouslySetInnerHTML or apply strict sanitization (XSS countermeasures).
+- Introduce input schema validation (zod, etc.), authorization guards, and rate limiting to all IPCs. Always mask sensitive information in logs.
 
-必要なら、このリストをチェックリスト化（優先度/工数見積もり付き）や、具体的な修正PRの下準備まで対応します。
+If needed, this list can be converted into a checklist (with priority/effort estimates), or preparation for specific fix PRs can be provided.

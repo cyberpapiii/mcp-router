@@ -1,92 +1,92 @@
-# Tool Catalog & Search 設計
+# Tool Catalog & Search Design
 
 ## TL;DR
-- 検索/実行は固定の MCP メタツール `tool_discovery` / `tool_execute` で提供し、動的なツール追加は行わない。
-- 検索リクエスト時に Available Tool List を収集し、クラウド Search API で検索。失敗時はローカル BM25 にフォールバック。
-- token・project・`tool_permissions`・稼働状況によるフィルタはローカルで適用する。検索対象/結果はツールのみ。
-- UI 変更は最小限。検索 UI/CLI は増やさず、フロントはメタツール経由で利用する。
+- Search/execution is provided via fixed MCP meta-tools `tool_discovery` / `tool_execute`; no dynamic tool addition.
+- Available Tool List is collected at search request time and searched via Cloud Search API. Falls back to local BM25 on failure.
+- Filtering by token, project, `tool_permissions`, and server status is applied locally. Search targets/results are tools only.
+- UI changes are minimal. No additional search UI/CLI; frontend uses meta-tools.
 
-## 現状と課題
-- `AggregatorServer` + `RequestHandlers` が複数 MCP サーバを集約し、HTTP 入口 `MCPHttpServer` は `_meta.token/_meta.projectId` を付与して転送。
-- サーバ設定・稼働状態は `MCPServerManager` + SQLite（`servers.tool_permissions` を含む）で保持。ツール/リソース/プロンプトのメタは永続化せず、毎回 `listTools/listResources/listPrompts` で取得。
-- ワークスペース切替時に DB/サービスはリセット。`PlatformAPI` にカタログ検索系がなく、UI/CLI から検索不可。LLM も固定メタツールがなく、自然文検索/指定実行ができない。
+## Current State and Issues
+- `AggregatorServer` + `RequestHandlers` aggregates multiple MCP servers; HTTP entry point `MCPHttpServer` attaches `_meta.token/_meta.projectId` and forwards.
+- Server config and status are held by `MCPServerManager` + SQLite (including `servers.tool_permissions`). Tool/resource/prompt metadata is not persisted; fetched each time via `listTools/listResources/listPrompts`.
+- On workspace switch, DB/services reset. `PlatformAPI` lacks catalog search capabilities; search unavailable from UI/CLI. LLM has no fixed meta-tools and cannot perform natural language search/execute.
 
-## ゴールと非ゴール
+## Goals and Non-Goals
 
-### Phase 1: ローカル検索（現在）
-- ゴール
-  - `tool_discovery` / `tool_execute` を通じて LLM/既存 MCP クライアントがプロジェクト/トークン境界を保ったまま検索・実行できる。
-  - BM25 アルゴリズムによるローカル検索を提供する。
-  - 検索リクエスト時に Available Tool List を動的に収集し、事前のインデックス化は不要とする。
-- 非ゴール
-  - CLI 向け新規コマンドや検索専用 UI の追加は行わない。
-  - ツール実行回数の集計やレコメンドは後続。
-  - `listTools` で動的に全ツールを追加/更新することはしない（固定2ツールのみ）。
-  - プロンプト/リソースの検索は対象外。
-  - ローカルにカタログ DB を永続化しない。
+### Phase 1: Local Search (Current)
+- Goals
+  - Enable LLM/existing MCP clients to search and execute while maintaining project/token boundaries via `tool_discovery` / `tool_execute`.
+  - Provide local search using BM25 algorithm.
+  - Dynamically collect Available Tool List at search request time; no pre-indexing required.
+- Non-Goals
+  - No new CLI commands or dedicated search UI.
+  - Tool execution count aggregation and recommendations are follow-up.
+  - No dynamic tool addition/updates via `listTools` (fixed 2 tools only).
+  - Prompt/resource search is out of scope.
+  - No local catalog DB persistence.
 
-### Phase 2: クラウド検索（後続）
-- ゴール
-  - クラウド Search API による高度な検索（LLMベース選択など）を提供する。
-  - フォールバック戦略: クラウド Search API → 失敗 → ローカル BM25 にフォールバック。
-- 非ゴール
-  - クラウドへのカタログ同期（Available Tool List はリクエスト時に送信するため不要）。
+### Phase 2: Cloud Search (Follow-up)
+- Goals
+  - Provide advanced search via Cloud Search API (LLM-based selection, etc.).
+  - Fallback strategy: Cloud Search API → failure → fallback to local BM25.
+- Non-Goals
+  - Catalog sync to cloud (unnecessary as Available Tool List is sent at request time).
 
-## ユースケース/要求
-- 機能: 自然文クエリ＋`maxResults` でツール検索し、スコア付き結果を返す。
-- 実行: `tool_execute` で `toolKey`/`arguments` を指定して実行し、`tool_permissions`/稼働状況/トークン境界を検証する。
-- 監査: 検索リクエストを `mcp-logger` に記録する。
-- セキュリティ: token 未指定時の扱いを明確化（デフォルト拒否）。`tool_permissions=false` は検索対象外。`projectId` 不一致は除外。
+## Use Cases / Requirements
+- Feature: Search tools with natural language query + `maxResults`, return scored results.
+- Execution: Execute via `tool_execute` with `toolKey`/`arguments`, validate `tool_permissions`/status/token boundary.
+- Audit: Log search requests to `mcp-logger`.
+- Security: Clarify handling when token is not specified (default deny). `tool_permissions=false` excluded from search. `projectId` mismatch excluded.
 
-## アーキテクチャ概要
-- ローカル: 検索リクエスト時に稼働中サーバから Available Tool List を収集し、検索プロバイダーに委譲。
-- 検索プロバイダー: クラウド Search API（優先）→ ローカル BM25（フォールバック）。
-- 入口: 検索/実行は MCP メタツールに統一。
+## Architecture Overview
+- Local: Collect Available Tool List from running servers at search request time, delegate to search provider.
+- Search Provider: Cloud Search API (priority) → Local BM25 (fallback).
+- Entry Point: Search/execution unified via MCP meta-tools.
 
-## プロジェクト設定
+## Project Settings
 
-ツールカタログはプロジェクト毎に設定を保持できる。設定は `projects` テーブルの `optimization` カラムに保存される。
+Tool catalog can hold per-project settings. Settings are stored in the `optimization` column of the `projects` table.
 
-### 設定項目
+### Configuration Items
 ```typescript
 // packages/shared/src/types/project-types.ts
 type ToolCatalogSearchStrategy = 'bm25' | 'cloud';
 type ProjectOptimization = ToolCatalogSearchStrategy | null;
 
-// projects.optimization カラム: ProjectOptimization
-// - null: ツールカタログ無効
-// - 'bm25': ローカル BM25 検索
-// - 'cloud': クラウド検索（Phase 2 で実装予定）
+// projects.optimization column: ProjectOptimization
+// - null: Tool catalog disabled
+// - 'bm25': Local BM25 search
+// - 'cloud': Cloud search (to be implemented in Phase 2)
 ```
 
-### 動作
-- `optimization = null` の場合、`tool_discovery` は空の結果を返す。
-- `optimization = 'cloud'` を選択していても、クラウド検索が利用不可の場合は BM25 にフォールバック。
+### Behavior
+- When `optimization = null`, `tool_discovery` returns empty results.
+- Even when `optimization = 'cloud'` is selected, falls back to BM25 if cloud search is unavailable.
 
 ### UI
-- プロジェクト設定モーダル（歯車アイコン）から「Context Optimization」を編集可能。
-- トグル OFF → `optimization = null`（無効）
-- トグル ON + 戦略選択 → `optimization = 'bm25'` または `'cloud'`
+- Edit "Context Optimization" from project settings modal (gear icon).
+- Toggle OFF → `optimization = null` (disabled)
+- Toggle ON + strategy selection → `optimization = 'bm25'` or `'cloud'`
 
-## コンポーネントと責務
+## Components and Responsibilities
 
-### ローカル (Router/Electron)
-- ToolCatalogService（統合サービス）: 以下の機能を統合して提供。
-  - **ツールリスト収集**: 検索リクエスト時に `MCPServerManager` が保持する稼働サーバから `listTools` を実行し、`tool_permissions`/`projectId`/`serverStatusMap` でフィルタした Available Tool List を構築。
-  - **検索プロバイダー管理**: クラウド Search API → ローカル BM25 のフォールバック戦略を実装。
-- SearchProvider インターフェース: 検索アルゴリズムの抽象化。
-  - `BM25SearchProvider`: ローカル BM25 検索（フォールバック用）。
-  - `CloudSearchProvider`（後続）: クラウド Search API 呼び出し。
-- RequestHandlers（メタツール）: `AggregatorServer`/`RequestHandlers` に `tool_discovery` / `tool_execute` を追加。`CallTool` で捕捉し、`ToolCatalogService` に委譲。`ListTools` は固定2ツールのみを返す。
-- Logging: `tool_discovery`/`tool_execute` 呼び出し結果を `mcp-logger` に送出。
+### Local (Router/Electron)
+- ToolCatalogService (Integrated Service): Provides the following integrated features.
+  - **Tool List Collection**: Execute `listTools` from running servers held by `MCPServerManager` at search request time, build Available Tool List filtered by `tool_permissions`/`projectId`/`serverStatusMap`.
+  - **Search Provider Management**: Implement fallback strategy: Cloud Search API → Local BM25.
+- SearchProvider Interface: Abstraction of search algorithms.
+  - `BM25SearchProvider`: Local BM25 search (for fallback).
+  - `CloudSearchProvider` (follow-up): Cloud Search API calls.
+- RequestHandlers (Meta-tools): Add `tool_discovery` / `tool_execute` to `AggregatorServer`/`RequestHandlers`. Capture in `CallTool`, delegate to `ToolCatalogService`. `ListTools` returns only fixed 2 tools.
+- Logging: Send `tool_discovery`/`tool_execute` call results to `mcp-logger`.
 
-### クラウド（後続）
-- Search API: `/catalog/search` で Available Tool List と Query を受け取り、適切なツールを選択して返却。
-- Auth: Router 発行トークンを Bearer で検証。`projectId` 境界でのアクセス制御を行う。
+### Cloud (Follow-up)
+- Search API: `/catalog/search` receives Available Tool List and Query, selects and returns appropriate tools.
+- Auth: Verify Router-issued token via Bearer. Access control at `projectId` boundary.
 
-## API とスキーマ
+## API and Schema
 
-### クラウド REST（案）
+### Cloud REST (Draft)
 - `POST /catalog/search`
   ```ts
   type ToolInfo = {
@@ -106,14 +106,14 @@ type ProjectOptimization = ToolCatalogSearchStrategy | null;
     toolName: string;
     serverName: string;
     description?: string;
-    relevance: number;      // 0-1 正規化スコア
-    explanation?: string;   // 選択理由
+    relevance: number;      // 0-1 normalized score
+    explanation?: string;   // Selection reason
   };
   type SearchResponse = { results: SearchResult[] };
   ```
 
-### MCP メタツール `tool_discovery`
-- Input（CallTool `arguments`）:
+### MCP Meta-tool `tool_discovery`
+- Input (CallTool `arguments`):
   ```ts
   {
     query: string[]; // Search Queries
@@ -129,23 +129,23 @@ type ProjectOptimization = ToolCatalogSearchStrategy | null;
       toolName: string;
       serverName: string;
       description?: string;
-      relevance: number;      // 0-1 正規化スコア
-      explanation?: string;   // 任意の説明（選択理由など）
+      relevance: number;      // 0-1 normalized score
+      explanation?: string;   // Optional explanation (selection reason, etc.)
     }>;
   }
   ```
-- 実装:
-  1. `CallTool` で捕捉
-  2. ローカルで Available Tool List を収集（`TokenValidator`/`toolPermissions`/`serverStatusMap`/`projectId` でフィルタ）
-  3. クラウド Search API で検索（失敗時はローカル BM25 にフォールバック）
-  4. 選択結果を返却
+- Implementation:
+  1. Capture in `CallTool`
+  2. Collect Available Tool List locally (filter by `TokenValidator`/`toolPermissions`/`serverStatusMap`/`projectId`)
+  3. Search via Cloud Search API (fallback to local BM25 on failure)
+  4. Return selection results
 
-### MCP メタツール `tool_execute`
-- 設計背景: LLM や MCP クライアントによっては会話開始時のツールリストに固定されるため、動的にツールを実行できるよう固定メタツール経由でラップしている。
-- Input（CallTool `arguments`）:
+### MCP Meta-tool `tool_execute`
+- Design Background: Some LLMs and MCP clients are fixed to the tool list at conversation start, so wrapped via fixed meta-tool to enable dynamic tool execution.
+- Input (CallTool `arguments`):
   ```ts
   {
-    toolKey: string; // `${serverId}:${toolName}` など
+    toolKey: string; // `${serverId}:${toolName}` etc.
     arguments?: unknown;
   }
   ```
@@ -155,55 +155,55 @@ type ProjectOptimization = ToolCatalogSearchStrategy | null;
     result: unknown;
   }
   ```
-- 実装: `CallTool` で捕捉→`TokenValidator`/`toolPermissions`/`serverStatusMap`/`projectId` 検証→対象サーバへ `tools/call` を委譲。
+- Implementation: Capture in `CallTool` → Validate `TokenValidator`/`toolPermissions`/`serverStatusMap`/`projectId` → Delegate `tools/call` to target server.
 
-## 主要フロー
+## Main Flows
 
 ### Search
-1. クライアントが MCP で `tool_discovery` を CallTool（`_meta.token/_meta.projectId` 付き）。
-2. `ToolCatalogService` が稼働サーバから Available Tool List を収集（`TokenValidator`、`toolPermissions`、`serverStatusMap`、`projectId` でフィルタ済み）。
-3. 検索プロバイダーに委譲:
-   - **クラウド検索（優先）**: `/catalog/search` に Query と Available Tool List を送信。
-   - **失敗時フォールバック**: ローカル BM25 検索で候補をスコアリング。
-4. 選択結果を MCP レスポンスとして返却。
+1. Client calls `tool_discovery` via MCP CallTool (with `_meta.token/_meta.projectId`).
+2. `ToolCatalogService` collects Available Tool List from running servers (pre-filtered by `TokenValidator`, `toolPermissions`, `serverStatusMap`, `projectId`).
+3. Delegate to search provider:
+   - **Cloud Search (Priority)**: Send Query and Available Tool List to `/catalog/search`.
+   - **Fallback on Failure**: Score candidates with local BM25 search.
+4. Return selection results as MCP response.
 
 ### Execute
-1. クライアント/LLM が MCP で `tool_execute` を CallTool（`_meta.token/_meta.projectId` 付き）。
-2. `TokenValidator`/`toolPermissions`/`serverStatusMap`/`projectId` を検証。
-3. 対象サーバへ `tools/call` を委譲し、結果を返却。
+1. Client/LLM calls `tool_execute` via MCP CallTool (with `_meta.token/_meta.projectId`).
+2. Validate `TokenValidator`/`toolPermissions`/`serverStatusMap`/`projectId`.
+3. Delegate `tools/call` to target server and return result.
 
-## エラーハンドリングとセキュリティ
-- Token: `_meta.token` がない場合は検索/実行を拒否（要件によりオプションで許可）。401/403 は UI に表示。
-- Project: `_meta.projectId` が `UNASSIGNED_PROJECT_ID` または空の場合は null として扱い、フィルタ適用。
-- フォールバック: クラウド Search API は短め（例 5s）。エラー時はローカル BM25 にフォールバック。
-- ロギング: `requestId`, `serverId` を含めてローカルログに記録。
+## Error Handling and Security
+- Token: Reject search/execution when `_meta.token` is missing (optionally allow per requirements). Display 401/403 in UI.
+- Project: When `_meta.projectId` is `UNASSIGNED_PROJECT_ID` or empty, treat as null and apply filter.
+- Fallback: Cloud Search API has short timeout (e.g., 5s). Fallback to local BM25 on error.
+- Logging: Record to local log including `requestId`, `serverId`.
 
-## 段階的実装プラン
+## Phased Implementation Plan
 
-### Phase 1: ローカル検索 ✅
-1. 型整備: `packages/shared` に `SearchRequest/SearchResponse` 型を追加。
-2. SearchProvider インターフェース: 検索アルゴリズムの抽象化。
-3. BM25SearchProvider: ローカル BM25 検索の実装。
-4. ToolCatalogService: 検索リクエスト時に Available Tool List を収集し、SearchProvider に委譲。
-5. MCP メタツール: `RequestHandlers` に `tool_discovery` / `tool_execute` を追加。
+### Phase 1: Local Search ✅
+1. Type preparation: Add `SearchRequest/SearchResponse` types to `packages/shared`.
+2. SearchProvider Interface: Abstraction of search algorithms.
+3. BM25SearchProvider: Implement local BM25 search.
+4. ToolCatalogService: Collect Available Tool List at search request time, delegate to SearchProvider.
+5. MCP Meta-tools: Add `tool_discovery` / `tool_execute` to `RequestHandlers`.
 
-### Phase 2: クラウド検索（後続）
-1. CloudSearchProvider: クラウド Search API クライアントを実装。
-2. フォールバック戦略: クラウド → BM25 のフォールバックロジックを ToolCatalogService に実装。
-3. 計測/テスト: クラウド検索の精度評価、フォールバック挙動のテスト。
+### Phase 2: Cloud Search (Follow-up)
+1. CloudSearchProvider: Implement Cloud Search API client.
+2. Fallback Strategy: Implement Cloud → BM25 fallback logic in ToolCatalogService.
+3. Measurement/Testing: Evaluate cloud search accuracy, test fallback behavior.
 
-## 計測とテスト観点
-- スモーク: `tool_discovery` で検索できる、`tool_execute` で実行できる。
-- 負荷: 10+ サーバ時の検索応答時間を計測。
-- 信頼性: クラウド検索失敗時のフォールバック挙動を確認。
-- 回帰: `listResources/listPrompts` は従来通り、`listTools` は固定2ツールのみで動くことを確認。
+## Measurement and Test Perspectives
+- Smoke: Can search with `tool_discovery`, can execute with `tool_execute`.
+- Load: Measure search response time with 10+ servers.
+- Reliability: Verify fallback behavior on cloud search failure.
+- Regression: Confirm `listResources/listPrompts` work as before, `listTools` returns only fixed 2 tools.
 
-## リスク・未決事項
-- Search API スキーマの安定化とバージョン付け。後方互換をどう保つか。
-- 非稼働サーバの結果をどこまで表示するか（現状は除外想定）。
-- token 未指定時のポリシーを最終決定する必要がある。
+## Risks / Open Issues
+- Stabilization and versioning of Search API schema. How to maintain backward compatibility.
+- How much to display results from non-running servers (currently assumed excluded).
+- Need to finalize policy for when token is not specified.
 
-## アーキテクチャ図（Mermaid）
+## Architecture Diagram (Mermaid)
 ```mermaid
 flowchart LR
     subgraph Local["MCP Router (Local)"]
@@ -213,7 +213,7 @@ flowchart LR
         META["tool_discovery / tool_execute\n(RequestHandlers)"]
     end
 
-    subgraph Cloud["Cloud (後続実装)"]
+    subgraph Cloud["Cloud (Follow-up Implementation)"]
         CS["Search API"]
     end
 

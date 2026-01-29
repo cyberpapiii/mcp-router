@@ -1,22 +1,22 @@
-# ADR: データベース設計パターン
+# ADR: Database Design Patterns
 
-## ステータス
-承認済み（2025年8月）
+## Status
+Approved (August 2025)
 
-## コンテキスト
-MCP Routerプロジェクトのデータベース層は、SQLiteを使用し、Better-SQLite3ライブラリを通じてアクセスしている。プロジェクトの成長に伴い、以下の設計パターンを確立する必要があった：
+## Context
+The database layer of the MCP Router project uses SQLite, accessed through the Better-SQLite3 library. As the project grew, the following design patterns needed to be established:
 
-1. データアクセス層の抽象化
-2. エラーハンドリングの統一
-3. トランザクション管理
-4. 型安全性の確保
+1. Abstraction of the data access layer
+2. Unified error handling
+3. Transaction management
+4. Ensuring type safety
 
-## 決定事項
+## Decisions
 
-### 1. リポジトリパターンの採用
+### 1. Adoption of Repository Pattern
 
-#### BaseRepositoryクラス
-全てのリポジトリの基底クラスとして`BaseRepository<T>`を実装：
+#### BaseRepository Class
+Implemented `BaseRepository<T>` as the base class for all repositories:
 
 ```typescript
 export abstract class BaseRepository<T> {
@@ -29,12 +29,12 @@ export abstract class BaseRepository<T> {
     this.initializeTable();
   }
 
-  // 抽象メソッド
+  // Abstract methods
   protected abstract initializeTable(): void;
   protected abstract mapRowToEntity(row: any): T;
   protected abstract mapEntityToRow(entity: T): Record<string, any>;
 
-  // 共通CRUD操作
+  // Common CRUD operations
   public add(entity: T): void { /* ... */ }
   public getById(id: string): T | null { /* ... */ }
   public update(id: string, entity: Partial<T>): void { /* ... */ }
@@ -43,24 +43,24 @@ export abstract class BaseRepository<T> {
 }
 ```
 
-#### 利点
-- コードの再利用性
-- 一貫したAPIインターフェース
-- 型安全性の確保
-- テスタビリティの向上
+#### Advantages
+- Code reusability
+- Consistent API interface
+- Ensuring type safety
+- Improved testability
 
-### 2. SqliteManagerによるDB接続管理
+### 2. DB Connection Management via SqliteManager
 
-#### 設計
+#### Design
 ```typescript
 export class SqliteManager {
   private db: Database.Database;
-  
+
   constructor(dbPath: string) {
     this.db = new Database(dbPath);
   }
 
-  // ラッパーメソッド
+  // Wrapper methods
   execute(sql: string, params?: any): Database.RunResult;
   get<T>(sql: string, params?: any): T | undefined;
   all<T>(sql: string, params?: any): T[];
@@ -68,13 +68,13 @@ export class SqliteManager {
 }
 ```
 
-#### 責任
-- データベース接続の管理
-- SQLクエリの実行
-- トランザクション管理
-- プリペアドステートメントの管理
+#### Responsibilities
+- Database connection management
+- SQL query execution
+- Transaction management
+- Prepared statement management
 
-### 3. RepositoryFactoryによるシングルトン管理
+### 3. Singleton Management via RepositoryFactory
 
 ```typescript
 export class RepositoryFactory {
@@ -94,20 +94,20 @@ export class RepositoryFactory {
     if (!this.instances[key]) {
       this.instances[key] = new RepositoryClass(db);
     }
-    
+
     return this.instances[key];
   }
 }
 ```
 
-### 4. エンティティマッピング戦略
+### 4. Entity Mapping Strategy
 
-#### データベース行 → エンティティ
+#### Database Row to Entity
 ```typescript
 protected mapRowToEntity(row: any): Entity {
-  // JSON文字列のパース
-  // 型変換（0/1 → boolean）
-  // snake_case → camelCase変換
+  // Parse JSON strings
+  // Type conversion (0/1 to boolean)
+  // snake_case to camelCase conversion
   return {
     id: row.id,
     isActive: row.is_active === 1,
@@ -117,12 +117,12 @@ protected mapRowToEntity(row: any): Entity {
 }
 ```
 
-#### エンティティ → データベース行
+#### Entity to Database Row
 ```typescript
 protected mapEntityToRow(entity: Entity): Record<string, any> {
-  // JSONシリアライズ
-  // 型変換（boolean → 0/1）
-  // camelCase → snake_case変換
+  // JSON serialization
+  // Type conversion (boolean to 0/1)
+  // camelCase to snake_case conversion
   return {
     id: entity.id,
     is_active: entity.isActive ? 1 : 0,
@@ -132,68 +132,68 @@ protected mapEntityToRow(entity: Entity): Record<string, any> {
 }
 ```
 
-### 5. エラーハンドリング
+### 5. Error Handling
 
-#### 統一されたエラーハンドリングパターン
+#### Unified Error Handling Pattern
 ```typescript
 try {
-  // データベース操作
+  // Database operation
 } catch (error) {
-  console.error(`[${this.constructor.name}] 操作中にエラー:`, error);
-  throw error; // 上位層で処理
+  console.error(`[${this.constructor.name}] Error during operation:`, error);
+  throw error; // Handle at upper layer
 }
 ```
 
-### 6. 暗号化戦略
+### 6. Encryption Strategy
 
-機密データ（トークン、パスワードなど）はElectronのsafeStorageを使用して暗号化：
+Sensitive data (tokens, passwords, etc.) is encrypted using Electron's safeStorage:
 
 ```typescript
 protected mapEntityToRowForInsert(entity: Server): Record<string, any> {
   const row = this.mapEntityToRow(entity);
-  
-  // 機密データの暗号化
+
+  // Encrypt sensitive data
   if (row.bearer_token && safeStorage.isEncryptionAvailable()) {
     row.bearer_token = safeStorage.encryptString(row.bearer_token)
       .toString('base64');
   }
-  
+
   return row;
 }
 ```
 
-## 結果
+## Consequences
 
-### 利点
-1. **保守性**：統一されたパターンによる理解しやすいコード
-2. **拡張性**：新しいエンティティの追加が容易
-3. **型安全性**：TypeScriptの型システムを最大限活用
-4. **テスタビリティ**：依存性注入によるモックの容易さ
-5. **セキュリティ**：機密データの自動暗号化
+### Advantages
+1. **Maintainability**: Easy-to-understand code through unified patterns
+2. **Extensibility**: Easy addition of new entities
+3. **Type safety**: Maximum utilization of TypeScript's type system
+4. **Testability**: Easy mocking through dependency injection
+5. **Security**: Automatic encryption of sensitive data
 
-### 欠点
-1. **抽象化のオーバーヘッド**：単純な操作でも複数層を経由
-2. **学習曲線**：新規開発者の理解に時間が必要
+### Disadvantages
+1. **Abstraction overhead**: Even simple operations go through multiple layers
+2. **Learning curve**: Time required for new developers to understand
 
-## 代替案
+## Alternatives Considered
 
-### 代替案1：Active Recordパターン
-エンティティ自体にデータアクセスロジックを含める。
-- 利点：シンプルで直感的
-- 欠点：責任の分離が不明確、テストが困難
+### Alternative 1: Active Record Pattern
+Include data access logic within the entity itself.
+- Advantage: Simple and intuitive
+- Disadvantage: Unclear separation of responsibilities, difficult to test
 
-### 代替案2：Data Mapperパターン（ORM使用）
-TypeORMやPrismaなどの既存ORMを使用。
-- 利点：豊富な機能、コミュニティサポート
-- 欠点：依存関係の増加、パフォーマンスオーバーヘッド
+### Alternative 2: Data Mapper Pattern (using ORM)
+Use existing ORMs like TypeORM or Prisma.
+- Advantage: Rich features, community support
+- Disadvantage: Increased dependencies, performance overhead
 
-## 今後の検討事項
+## Future Considerations
 
-1. **クエリビルダー**：複雑なクエリのための型安全なビルダーの実装
-2. **キャッシング戦略**：頻繁にアクセスされるデータのキャッシング
-3. **監査ログ**：データ変更の自動記録機能
-4. **パフォーマンス最適化**：インデックス戦略の見直し
+1. **Query builder**: Implementation of type-safe builder for complex queries
+2. **Caching strategy**: Caching of frequently accessed data
+3. **Audit logging**: Automatic recording of data changes
+4. **Performance optimization**: Review of index strategy
 
-## 参照
-- [DATABASE_ARCHITECTURE.md](DATABASE_ARCHITECTURE.md) - データベースアーキテクチャ全体
-- [DATABASE_SCHEMA_MANAGEMENT.md](DATABASE_SCHEMA_MANAGEMENT.md) - スキーマ管理戦略
+## References
+- [DATABASE_ARCHITECTURE.md](DATABASE_ARCHITECTURE.md) - Overall database architecture
+- [DATABASE_SCHEMA_MANAGEMENT.md](DATABASE_SCHEMA_MANAGEMENT.md) - Schema management strategy

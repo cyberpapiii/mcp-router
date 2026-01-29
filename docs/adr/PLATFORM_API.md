@@ -1,109 +1,109 @@
-# ADR: Platform API アーキテクチャ
+# ADR: Platform API Architecture
 
-## ステータス
-採用済み（Accepted）
+## Status
+Accepted
 
-## コンテキスト
+## Context
 
-MCP Routerは、MCPサーバーを中心に管理するクロスプラットフォーム（Electron/Web）アプリケーションです。フロントエンドとバックエンドの通信を抽象化し、プラットフォーム固有の実装を隠蔽するためのAPIレイヤーが必要でした。
+MCP Router is a cross-platform (Electron/Web) application centered around MCP server management. An API layer was needed to abstract frontend-backend communication and hide platform-specific implementations.
 
-### 背景
+### Background
 
-当初、Electronの`window.electronAPI`をそのまま抽象化したフラットな構造で実装されていましたが、以下の課題がありました：
+Initially, Electron's `window.electronAPI` was implemented with a flat structure that was simply abstracted, but the following issues existed:
 
-1. **責任範囲が不明確**: 関連する機能が分散しており、メソッドの検索や理解が困難
-2. **型安全性の欠如**: 多くのメソッドが`any`型を使用
-3. **エラーハンドリングの不統一**: メソッドごとに異なるエラー処理パターン
-4. **プラットフォーム差異の不透明性**: Web版で利用できない機能が実行時まで分からない
+1. **Unclear responsibility scope**: Related features were scattered, making methods difficult to find and understand
+2. **Lack of type safety**: Many methods used `any` types
+3. **Inconsistent error handling**: Different error handling patterns for each method
+4. **Opaque platform differences**: Features unavailable in the web version were unknown until runtime
 
-## 決定
+## Decision
 
-### ドメイン駆動設計によるモジュール化
+### Modularization through Domain-Driven Design
 
-関連する機能を論理的なドメインに再編成し、主要なドメインAPIに整理しました：
+Related features were reorganized into logical domains and structured into main domain APIs:
 
 ```typescript
 // packages/shared/src/types/platform-api/ipc.ts
 interface PlatformAPI {
-  app: AppAPI;             // アプリケーション管理（トークン管理含む）
-  auth: AuthAPI;           // 認証・認可
-  hooks: HookAPI;          // MCPフック管理
-  log: LogAPI;             // ログ管理
-  package: PackageAPI;     // パッケージ管理（システムユーティリティ含む）
-  server: ServerAPI;       // MCPサーバー管理
-  settings: SettingsAPI;   // アプリケーション設定
-  workspace: WorkspaceAPI; // ワークスペース管理
+  app: AppAPI;             // Application management (including token management)
+  auth: AuthAPI;           // Authentication and authorization
+  hooks: HookAPI;          // MCP hook management
+  log: LogAPI;             // Log management
+  package: PackageAPI;     // Package management (including system utilities)
+  server: ServerAPI;       // MCP server management
+  settings: SettingsAPI;   // Application settings
+  workspace: WorkspaceAPI; // Workspace management
 }
 ```
 
-## 実装詳細
+## Implementation Details
 
-### 現在のコードベース構造
+### Current Codebase Structure
 
-1. **型定義の配置**
-   - `packages/shared/src/types/platform-api/ipc.ts`: メインのインターフェース定義
-   - `packages/shared/src/types/platform-api/domains/`: 各ドメインAPIの型定義
-   - `apps/electron/src/lib/platform-api/types/platform-api.ts`: Electron固有の型定義
+1. **Type definition locations**
+   - `packages/shared/src/types/platform-api/ipc.ts`: Main interface definitions
+   - `packages/shared/src/types/platform-api/domains/`: Type definitions for each domain API
+   - `apps/electron/src/lib/platform-api/types/platform-api.ts`: Electron-specific type definitions
 
-2. **実装**
-   - `apps/electron/src/frontend/lib/electron-platform-api.ts`: Electron環境での実装
-   - `apps/electron/src/frontend/lib/remote-platform-api.ts`: リモート（Web）環境での実装
+2. **Implementation**
+   - `apps/electron/src/frontend/lib/electron-platform-api.ts`: Implementation for Electron environment
+   - `apps/electron/src/frontend/lib/remote-platform-api.ts`: Implementation for remote (Web) environment
 
-3. **バックエンド管理**
-   - `apps/electron/src/main/platform-api-manager.ts`: ワークスペースに応じたAPIの切り替え
+3. **Backend Management**
+   - `apps/electron/src/main/platform-api-manager.ts`: API switching based on workspace
 
-### 各ドメインAPIの責務
+### Responsibilities of Each Domain API
 
 #### ServerAPI
-- MCPサーバーのCRUD操作
-- サーバーの起動・停止・再起動
-- ステータスとメトリクスの取得
-- ログ管理
+- CRUD operations for MCP servers
+- Server start/stop/restart
+- Status and metrics retrieval
+- Log management
 
 #### AuthAPI
-- ログイン・ログアウト
-- 認証ステータスの取得
-- 認証状態変更の監視
+- Login/logout
+- Authentication status retrieval
+- Authentication state change monitoring
 
 #### AppAPI
-- 外部URLを開く
-- バージョン情報の取得
-- トークン管理（生成、検証、破棄）
-- アップデート管理
+- Opening external URLs
+- Version information retrieval
+- Token management (generation, validation, revocation)
+- Update management
 
 #### PackageAPI
-- パッケージコマンドの解決
-- パッケージの更新
-- パッケージマネージャーの管理
-- システムコマンドのチェック
+- Package command resolution
+- Package updates
+- Package manager management
+- System command checking
 
 #### SettingsAPI
-- アプリケーション設定の取得・更新・リセット
-- 設定変更の監視
-- オーバーレイカウント管理
+- Application settings get/update/reset
+- Settings change monitoring
+- Overlay count management
 
 #### LogAPI
-- ログのクエリ
-- ログのクリア・エクスポート
-- リアルタイムログ更新の監視
+- Log queries
+- Log clearing/export
+- Real-time log update monitoring
 
 #### WorkspaceAPI
-- ワークスペースのCRUD操作
-- アクティブワークスペースの管理
-- ワークスペース変更の監視
+- Workspace CRUD operations
+- Active workspace management
+- Workspace change monitoring
 
 #### HookAPI
-- MCPフックのCRUD操作
-- フックの有効化・無効化
-- フックの実行順序管理
-- プリ・ポストフック処理
+- MCP hook CRUD operations
+- Hook enable/disable
+- Hook execution order management
+- Pre/post hook processing
 
-## アーキテクチャの特徴
+## Architecture Characteristics
 
-### 1. プラットフォーム抽象化
+### 1. Platform Abstraction
 
 ```typescript
-// Electron実装例
+// Electron implementation example
 class ElectronPlatformAPI implements PlatformAPI {
   auth: AuthAPI = {
     signIn: (provider) => window.electronAPI.login(provider),
@@ -113,9 +113,9 @@ class ElectronPlatformAPI implements PlatformAPI {
 }
 ```
 
-### 2. 型安全性
+### 2. Type Safety
 
-すべてのAPIメソッドは明確な型定義を持ち、`any`型の使用を避けています：
+All API methods have clear type definitions, avoiding the use of `any` types:
 
 ```typescript
 interface ServerAPI {
@@ -126,9 +126,9 @@ interface ServerAPI {
 }
 ```
 
-### 3. 統一されたコールバックパターン
+### 3. Unified Callback Pattern
 
-イベントリスナーは`Unsubscribe`関数を返す統一パターンを採用：
+Event listeners adopt a unified pattern returning an `Unsubscribe` function:
 
 ```typescript
 export type Unsubscribe = () => void;
@@ -138,37 +138,37 @@ interface AuthAPI {
 }
 ```
 
-## 影響と利点
+## Impact and Benefits
 
-### プラス面
+### Positives
 
-1. **開発効率の向上**
-   - ドメインごとに整理されたAPIで検索が容易
-   - IDE補完の精度向上
+1. **Improved Development Efficiency**
+   - APIs organized by domain make searching easy
+   - Improved IDE completion accuracy
 
-2. **保守性の改善**
-   - 関連機能がグループ化され理解しやすい
-   - 新機能追加時の影響範囲が明確
+2. **Improved Maintainability**
+   - Related features are grouped and easier to understand
+   - Clear impact scope when adding new features
 
-3. **型安全性**
-   - 厳密な型定義によるランタイムエラーの削減
-   - リファクタリングの安全性向上
+3. **Type Safety**
+   - Reduced runtime errors through strict type definitions
+   - Improved refactoring safety
 
-4. **拡張性**
-   - 新しいドメインの追加が容易
-   - プラットフォーム固有の実装を隠蔽
+4. **Extensibility**
+   - Easy to add new domains
+   - Platform-specific implementations are hidden
 
-### 考慮事項
+### Considerations
 
-1. **学習曲線**: 新しいAPI構造に慣れる必要がある
-2. **ドメイン境界**: 機能の配置で迷う場合がある（例：トークン管理をAppAPIに含めるか独立させるか）
+1. **Learning curve**: Need to become familiar with the new API structure
+2. **Domain boundaries**: May be uncertain where to place certain features (e.g., whether to include token management in AppAPI or make it independent)
 
-## 今後の方向性
+## Future Direction
 
-1. **エラーハンドリングの改善**: Result型パターンの導入検討
-2. **非同期操作の改善**: 長時間実行操作のJob API導入
-3. **バッチ操作**: 複数操作の一括実行サポート
+1. **Error handling improvements**: Consider introducing Result type pattern
+2. **Async operation improvements**: Introduce Job API for long-running operations
+3. **Batch operations**: Support bulk execution of multiple operations
 
-## 結論
+## Conclusion
 
-Platform APIのドメイン駆動設計による再構成により、コードベースの構造が明確になり、開発効率と保守性が向上しました。このアーキテクチャは、MCP Routerのクロスプラットフォーム要件を満たしながら、将来の拡張にも対応できる柔軟性を持っています。
+The domain-driven design reorganization of the Platform API has clarified the codebase structure and improved development efficiency and maintainability. This architecture meets MCP Router's cross-platform requirements while maintaining flexibility for future expansion.

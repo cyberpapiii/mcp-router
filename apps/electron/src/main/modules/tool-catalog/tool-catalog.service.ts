@@ -132,6 +132,8 @@ export class ToolCatalogService {
             projectId: server.projectId ?? null,
             description: tool.description,
             inputSchema: tool.inputSchema as ToolInfo["inputSchema"],
+            outputSchema: tool.outputSchema,
+            annotations: tool.annotations as ToolInfo["annotations"],
           });
         }
       } catch (error) {

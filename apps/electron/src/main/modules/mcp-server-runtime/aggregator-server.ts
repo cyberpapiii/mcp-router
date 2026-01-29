@@ -49,6 +49,14 @@ export class AggregatorServer {
             resources: {},
             tools: {},
             prompts: {},
+            // Enable elicitation passthrough (MCP 2025-06-18/2025-11-25)
+            // Using experimental namespace until SDK types are updated
+            experimental: {
+              elicitation: {
+                form: {},
+                url: {},
+              },
+            },
           },
         },
       );

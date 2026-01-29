@@ -248,6 +248,8 @@ export class ToolCatalogHandler extends RequestHandlerBase {
           description: result.description,
           relevance: result.relevance,
           explanation: result.explanation,
+          outputSchema: result.outputSchema,
+          annotations: result.annotations,
         }));
 
         return {

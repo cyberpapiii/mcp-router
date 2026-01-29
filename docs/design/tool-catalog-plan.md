@@ -131,6 +131,14 @@ type ProjectOptimization = ToolCatalogSearchStrategy | null;
       description?: string;
       relevance: number;      // 0-1 normalized score
       explanation?: string;   // Optional explanation (selection reason, etc.)
+      outputSchema?: object;  // JSON Schema for structured output (MCP 2025-03-26)
+      annotations?: {         // Behavioral hints for clients (MCP 2025-03-26)
+        title?: string;
+        readOnlyHint?: boolean;
+        destructiveHint?: boolean;
+        idempotentHint?: boolean;
+        openWorldHint?: boolean;
+      };
     }>;
   }
   ```

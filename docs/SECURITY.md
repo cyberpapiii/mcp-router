@@ -222,3 +222,47 @@ Recommendations for fixing this vulnerability are as follows:
 - More strictly control hook script execution to prevent resource-intensive operations and infinite loops.
 - Limit the scope of context data accessible to hook scripts to prevent sensitive data leakage.
 - Implement context data escaping and validation to reduce information leakage risk.
+
+---
+
+## Implemented Mitigations (2026-01-29)
+
+The following security mitigations have been implemented as part of the MCP Spec 2025-11-25 upgrade:
+
+### URL Validation Utility (Addresses #2: SSRF)
+
+**File:** `apps/electron/src/main/utils/url-validation-utils.ts`
+
+Added `validateExternalUrl()` and `validateElicitationUrl()` functions that block:
+- Internal hosts (localhost, 127.0.0.1, 0.0.0.0, [::1])
+- Private IP ranges (10.x.x.x, 172.16-31.x.x, 192.168.x.x)
+- Cloud metadata endpoints (169.254.169.254, metadata.google.internal)
+- Non-HTTPS URLs for elicitation (security requirement)
+
+### Token Expiration (Addresses #3: Token Management)
+
+**Files:**
+- `packages/shared/src/types/token-types.ts`
+- `apps/electron/src/main/modules/mcp-apps-manager/token-manager.ts`
+
+Tokens now have:
+- Optional `expiresAt` field (UNIX timestamp)
+- Default expiration of 24 hours when generated
+- `validateToken()` checks expiration before returning valid
+
+### RFC 8707 Resource Indicators (Preparation)
+
+**File:** `packages/shared/src/types/token-types.ts`
+
+Added `TokenResourceIndicator` type for future OAuth 2.1 compliance:
+- `resource`: Resource server URI the token is valid for
+- `scopes`: Scopes granted for the resource
+
+### Elicitation URL Security
+
+**File:** `apps/electron/src/main/modules/mcp-server-runtime/request-handlers.ts`
+
+All URL mode elicitation requests are validated:
+- Only HTTPS URLs are allowed
+- Internal hosts and private IPs are blocked
+- Cloud metadata endpoints are blocked

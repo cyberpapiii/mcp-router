@@ -8,6 +8,17 @@
 export type TokenServerAccess = Record<string, boolean>;
 
 /**
+ * OAuth 2.1 Resource Indicators (RFC 8707)
+ * Used to restrict token scope to specific resource servers
+ */
+export interface TokenResourceIndicator {
+  /** Resource server URI this token is valid for */
+  resource: string;
+  /** Scopes granted for this resource */
+  scopes?: string[];
+}
+
+/**
  * トークンのインターフェース
  */
 export interface Token {
@@ -15,6 +26,9 @@ export interface Token {
   clientId: string; // 関連付けられたクライアントID
   issuedAt: number; // トークン発行時のUNIXタイムスタンプ
   serverAccess: TokenServerAccess; // サーバーごとのアクセス権（true=許可、false=拒否）
+  expiresAt?: number; // トークンの有効期限（UNIXタイムスタンプ）
+  /** RFC 8707 resource indicators - restricts token to specific resources */
+  resourceIndicators?: TokenResourceIndicator[];
 }
 
 /**

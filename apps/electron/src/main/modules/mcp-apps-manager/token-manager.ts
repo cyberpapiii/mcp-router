@@ -25,11 +25,8 @@ export class TokenManager {
       McpAppsManagerRepository.getInstance().deleteClientTokens(clientId);
     }
 
-    // Set default expiration to 24 hours if not specified
-    const defaultExpirationSeconds = 24 * 60 * 60;
-    const expiresAt = options.expiresIn
-      ? now + options.expiresIn
-      : now + defaultExpirationSeconds;
+    // Only set expiration if explicitly requested
+    const expiresAt = options.expiresIn ? now + options.expiresIn : undefined;
 
     // より強固なランダム値を生成（24バイト = 192ビット）
     const randomBytes = crypto

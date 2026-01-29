@@ -68,3 +68,60 @@ export function createUriVariants(
 
   return uriFormats;
 }
+
+/**
+ * Transform resource URIs in tool results to use router's namespace
+ * This ensures resource links in tool results point to the router, not backend servers
+ */
+export function transformResourceLinksInResult(
+  result: any,
+  serverName: string,
+): any {
+  if (!result) return result;
+
+  // Handle array of content items
+  if (Array.isArray(result.content)) {
+    return {
+      ...result,
+      content: result.content.map((item: any) =>
+        transformResourceContentItem(item, serverName),
+      ),
+    };
+  }
+
+  return result;
+}
+
+/**
+ * Transform a single content item that may contain resource links
+ */
+function transformResourceContentItem(item: any, serverName: string): any {
+  if (!item || typeof item !== "object") return item;
+
+  // Handle resource type content
+  if (item.type === "resource" && item.resource?.uri) {
+    return {
+      ...item,
+      resource: {
+        ...item.resource,
+        uri: createResourceUri(serverName, item.resource.uri),
+      },
+    };
+  }
+
+  // Handle embedded resources in text
+  if (item.type === "text" && item.annotations?.resourceLinks) {
+    return {
+      ...item,
+      annotations: {
+        ...item.annotations,
+        resourceLinks: item.annotations.resourceLinks.map((link: any) => ({
+          ...link,
+          uri: createResourceUri(serverName, link.uri),
+        })),
+      },
+    };
+  }
+
+  return item;
+}

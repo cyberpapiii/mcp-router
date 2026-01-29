@@ -125,6 +125,8 @@
     "feedbackDescription": "フィードバックやご提案がありましたら、お聞かせください。",
     "loadExternalMCPConfigs": "外部アプリケーションからMCP設定を読み込む",
     "loadExternalMCPConfigsDescription": "Claude for Desktopなどの他のアプリケーションからサーバー設定をインポートできるようにします",
+    "prefixToolNames": "ツール名にサーバー名をプレフィックスとして付与",
+    "prefixToolNamesDescription": "ツール名にソースサーバーのプレフィックスを追加します（例：krisp__search_meetings）",
     "analytics": "使用状況の送信",
     "analyticsDescription": "アプリの改善のため、匿名の使用状況データを送信します",
     "autoUpdate": "自動アップデート",

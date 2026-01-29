@@ -154,9 +154,18 @@ export class MCPAggregator {
     for (const result of results) {
       if (result) {
         for (const tool of result.tools) {
-          // Map tool to server
-          this.toolToServerMap.set(tool.name, result.serverId);
-          allTools.push(tool);
+          // Get server name from the serverClient
+          const serverName =
+            this.clients.get(result.serverId)?.name || result.serverId;
+          const prefixedName = `${serverName}__${tool.name}`;
+
+          // Map prefixed tool name to server
+          this.toolToServerMap.set(prefixedName, result.serverId);
+          allTools.push({
+            ...tool,
+            name: prefixedName,
+            sourceServer: serverName,
+          });
         }
       }
     }
@@ -183,10 +192,15 @@ export class MCPAggregator {
       );
     }
 
+    // Extract original tool name by removing server prefix
+    const originalToolName = name.includes("__")
+      ? name.substring(name.indexOf("__") + 2)
+      : name;
+
     try {
       return await serverClient.client.callTool(
         {
-          name,
+          name: originalToolName,
           arguments: args || {},
         },
         undefined,

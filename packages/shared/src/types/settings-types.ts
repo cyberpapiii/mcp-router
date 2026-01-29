@@ -70,6 +70,13 @@ export interface AppSettings {
    * Cloud Syncの状態
    */
   cloudSync?: CloudSyncState;
+
+  /**
+   * ツール名にソースサーバー名をプレフィックスとして付与するか
+   * Tool names will be prefixed with source server name (e.g., "krisp__search_meetings")
+   * デフォルト: true
+   */
+  prefixToolNames?: boolean;
 }
 
 /**
@@ -90,4 +97,5 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   cloudSync: {
     enabled: false,
   },
+  prefixToolNames: true,
 };

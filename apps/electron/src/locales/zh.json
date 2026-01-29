@@ -97,6 +97,8 @@
     "showWindowOnStartupDescription": "当电脑启动时显示 MCP Router 主窗口。关闭后将在后台启动。",
     "loadExternalMCPConfigs": "从外部应用程序加载 MCP 配置",
     "loadExternalMCPConfigsDescription": "允许 MCP Router 从其他应用程序（如 Claude for Desktop）导入服务器配置",
+    "prefixToolNames": "为工具名称添加服务器前缀",
+    "prefixToolNamesDescription": "在工具名称中添加源服务器前缀（例如：krisp__search_meetings）以便于识别",
     "analytics": "发送使用情况分析",
     "analyticsDescription": "发送匿名使用数据以帮助改进应用"
   },

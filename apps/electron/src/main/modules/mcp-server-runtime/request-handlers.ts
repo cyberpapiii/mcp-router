@@ -15,6 +15,7 @@ import {
   ToolCatalogHandler,
   META_TOOLS,
 } from "@/main/modules/tool-catalog/tool-catalog-handler";
+import { getSharedConfigManager } from "@/main/infrastructure/shared-config-manager";
 
 /**
  * Handles all request processing for the aggregator server
@@ -107,6 +108,16 @@ export class RequestHandlers extends RequestHandlerBase {
   private isToolCatalogEnabled(projectId: string | null): boolean {
     const optimization = this.getProjectOptimization(projectId);
     return !!optimization;
+  }
+
+  /**
+   * Check if tool names should be prefixed with server name
+   * @returns true if prefixToolNames setting is enabled (defaults to true)
+   */
+  private shouldPrefixToolNames(): boolean {
+    const settings = getSharedConfigManager().getSettings();
+    // Default to true if not explicitly set
+    return settings.prefixToolNames !== false;
   }
 
   /**
@@ -612,13 +623,18 @@ export class RequestHandlers extends RequestHandlerBase {
             continue;
           }
 
+          // Prefix tool name with server name if setting is enabled
+          const prefixedName = this.shouldPrefixToolNames()
+            ? `${serverName}__${tool.name}`
+            : tool.name;
+
           const toolWithSource = {
             ...tool,
-            name: tool.name,
+            name: prefixedName,
             sourceServer: serverName,
           };
 
-          toolMap.set(tool.name, serverName);
+          toolMap.set(prefixedName, serverName);
           allTools.push(toolWithSource);
         }
       } catch (error: any) {
@@ -673,7 +689,12 @@ export class RequestHandlers extends RequestHandlerBase {
       );
     }
     const serverName = mappedServerName;
-    const originalToolName = toolName;
+
+    // Extract original tool name by stripping the server prefix if present
+    // Tool names are prefixed as "serverName__toolName" when prefixToolNames is enabled
+    const originalToolName = toolName.includes("__")
+      ? toolName.substring(toolName.indexOf("__") + 2)
+      : toolName;
 
     const clientId = this.tokenValidator.validateTokenAndAccess(
       token,

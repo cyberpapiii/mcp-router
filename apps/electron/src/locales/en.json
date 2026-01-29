@@ -126,6 +126,8 @@
     "feedbackDescription": "Have feedback or suggestions? Let us know!",
     "loadExternalMCPConfigs": "Load MCP configurations from external applications",
     "loadExternalMCPConfigsDescription": "Allow MCP Router to import server configurations from other applications like Claude for Desktop",
+    "prefixToolNames": "Prefix tool names with server name",
+    "prefixToolNamesDescription": "Add source server prefix to tool names (e.g., krisp__search_meetings) for easier identification",
     "analytics": "Send usage analytics",
     "analyticsDescription": "Send anonymous usage data to help improve the app",
     "autoUpdate": "Enable automatic updates",

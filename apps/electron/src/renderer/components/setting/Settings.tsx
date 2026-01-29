@@ -34,6 +34,7 @@ const Settings: React.FC = () => {
   const [analyticsEnabled, setAnalyticsEnabled] = useState<boolean>(true);
   const [autoUpdateEnabled, setAutoUpdateEnabled] = useState<boolean>(true);
   const [showWindowOnStartup, setShowWindowOnStartup] = useState<boolean>(true);
+  const [prefixToolNames, setPrefixToolNames] = useState<boolean>(true);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
 
   // Cloud Sync state
@@ -90,6 +91,7 @@ const Settings: React.FC = () => {
         setAnalyticsEnabled(settings.analyticsEnabled ?? true);
         setAutoUpdateEnabled(settings.autoUpdateEnabled ?? true);
         setShowWindowOnStartup(settings.showWindowOnStartup ?? true);
+        setPrefixToolNames(settings.prefixToolNames ?? true);
       } catch {
         console.log("Failed to load settings, using defaults");
       }
@@ -226,6 +228,24 @@ const Settings: React.FC = () => {
     } catch (error) {
       console.error("Failed to save startup visibility settings:", error);
       setShowWindowOnStartup(!checked);
+    } finally {
+      setIsSavingSettings(false);
+    }
+  };
+
+  // Handle prefix tool names toggle
+  const handlePrefixToolNamesToggle = async (checked: boolean) => {
+    setPrefixToolNames(checked);
+    setIsSavingSettings(true);
+    try {
+      const currentSettings = await platformAPI.settings.get();
+      await platformAPI.settings.save({
+        ...currentSettings,
+        prefixToolNames: checked,
+      });
+    } catch (error) {
+      console.error("Failed to save prefix tool names settings:", error);
+      setPrefixToolNames(!checked);
     } finally {
       setIsSavingSettings(false);
     }
@@ -574,6 +594,23 @@ const Settings: React.FC = () => {
             <Switch
               checked={loadExternalMCPConfigs}
               onCheckedChange={handleExternalMCPConfigsToggle}
+              disabled={isSavingSettings}
+            />
+          </div>
+
+          {/* Prefix Tool Names */}
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <label className="text-sm font-medium">
+                {t("settings.prefixToolNames")}
+              </label>
+              <p className="text-xs text-muted-foreground">
+                {t("settings.prefixToolNamesDescription")}
+              </p>
+            </div>
+            <Switch
+              checked={prefixToolNames}
+              onCheckedChange={handlePrefixToolNamesToggle}
               disabled={isSavingSettings}
             />
           </div>

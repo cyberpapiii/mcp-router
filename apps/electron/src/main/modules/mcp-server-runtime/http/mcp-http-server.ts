@@ -8,6 +8,7 @@ import { getPlatformAPIManager } from "../../workspace/platform-api-manager";
 import { TokenValidator } from "../token-validator";
 import { ProjectRepository } from "../../projects/projects.repository";
 import { PROJECT_HEADER, UNASSIGNED_PROJECT_ID } from "@mcp_router/shared";
+import { createApiRouter } from "./api-router";
 
 /**
  * HTTP server that exposes MCP functionality through REST endpoints
@@ -16,6 +17,7 @@ export class MCPHttpServer {
   private app: express.Application;
   private server: http.Server | null = null;
   private port: number;
+  private serverManager: MCPServerManager;
   private aggregatorServer: AggregatorServer;
   private tokenValidator: TokenValidator;
   // SSEセッション用のマップ
@@ -27,6 +29,7 @@ export class MCPHttpServer {
     port: number,
     aggregatorServer?: AggregatorServer,
   ) {
+    this.serverManager = serverManager;
     this.aggregatorServer =
       aggregatorServer || new AggregatorServer(serverManager);
     this.port = port;
@@ -97,6 +100,9 @@ export class MCPHttpServer {
 
     // /mcp/sse エンドポイントを直接ルートに設定し、バージョニングなしで公開
     this.app.use("/mcp/sse", authMiddleware);
+
+    // /api routes need authentication
+    this.app.use("/api", authMiddleware);
   }
 
   /**
@@ -105,6 +111,12 @@ export class MCPHttpServer {
   private configureRoutes(): void {
     this.configureMcpRoute();
     this.configureMcpSseRoute();
+    this.configureApiRoutes();
+  }
+
+  private configureApiRoutes(): void {
+    const apiRouter = createApiRouter(this.serverManager);
+    this.app.use("/api", apiRouter);
   }
 
   private resolveProjectFilter(

@@ -1,10 +1,79 @@
 import process from "node:process";
 import { execa } from "execa";
 import stripAnsi from "strip-ansi";
-import { userInfo } from "node:os";
+import { userInfo, homedir } from "node:os";
 import { logInfo } from "@/main/utils/logger";
 
 const DELIMITER = "_ENV_DELIMITER_";
+
+/**
+ * Get common paths where npm/node binaries might be installed
+ * This is used as a fallback when shell environment capture fails
+ */
+function getCommonNodePaths(): string[] {
+  const home = homedir();
+  const paths: string[] = [];
+
+  if (process.platform === "darwin" || process.platform === "linux") {
+    // Homebrew (macOS)
+    paths.push("/opt/homebrew/bin");
+    paths.push("/usr/local/bin");
+
+    // nvm - check common node versions
+    const nvmBase = `${home}/.nvm/versions/node`;
+    // Add current node version path if running under nvm
+    if (process.env.NVM_BIN) {
+      paths.push(process.env.NVM_BIN);
+    }
+    // Common nvm paths - try to find installed versions
+    paths.push(`${nvmBase}/v20.19.0/bin`);
+    paths.push(`${nvmBase}/v22.0.0/bin`);
+    paths.push(`${nvmBase}/v18.0.0/bin`);
+
+    // fnm (Fast Node Manager)
+    paths.push(`${home}/.fnm/current/bin`);
+    paths.push(`${home}/Library/Application Support/fnm/current/bin`);
+
+    // volta
+    paths.push(`${home}/.volta/bin`);
+
+    // asdf
+    paths.push(`${home}/.asdf/shims`);
+
+    // n (node version manager)
+    paths.push("/usr/local/n/versions/node/20.19.0/bin");
+
+    // Standard system paths
+    paths.push("/usr/bin");
+    paths.push("/bin");
+    paths.push("/usr/sbin");
+    paths.push("/sbin");
+
+    // User local bin
+    paths.push(`${home}/.local/bin`);
+    paths.push(`${home}/bin`);
+  }
+
+  return paths;
+}
+
+/**
+ * Augment PATH with common node binary locations
+ */
+function augmentPath(existingPath: string | undefined): string {
+  const commonPaths = getCommonNodePaths();
+  const existingPaths = existingPath ? existingPath.split(":") : [];
+
+  // Combine existing PATH with common paths, removing duplicates
+  const allPaths = [...existingPaths];
+  for (const p of commonPaths) {
+    if (!allPaths.includes(p)) {
+      allPaths.push(p);
+    }
+  }
+
+  return allPaths.join(":");
+}
 
 /**
  * Check if a command exists in the system's PATH
@@ -89,6 +158,7 @@ export async function getUserShellEnv() {
         env: {
           DISABLE_AUTO_UPDATE: "true",
         },
+        timeout: 10000, // 10 second timeout to prevent hanging
       },
     );
 
@@ -103,10 +173,24 @@ export async function getUserShellEnv() {
       shellEnv[key] = values.join("=");
     }
 
+    // Augment PATH with common node paths to ensure npm/npx are found
+    if (shellEnv.PATH) {
+      shellEnv.PATH = augmentPath(shellEnv.PATH);
+    }
+
     return shellEnv;
-  } catch (_error) {
+  } catch (error) {
     // シェルの起動に失敗した場合は、Electron / Node.js の既存の環境変数を返す
-    return { ...process.env };
+    // Augment PATH with common paths to help find npm/npx binaries
+    console.warn(
+      "[env-utils] Failed to capture shell environment, using fallback with augmented PATH:",
+      error instanceof Error ? error.message : error,
+    );
+
+    const fallbackEnv = { ...process.env };
+    fallbackEnv.PATH = augmentPath(fallbackEnv.PATH);
+
+    return fallbackEnv;
   }
 }
 

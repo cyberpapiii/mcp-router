@@ -23,6 +23,7 @@ import {
   getSettingsService,
 } from "@/main/modules/settings/settings.service";
 import { getSkillService } from "@/main/modules/skills/skills.service";
+import { cleanupOldLogs } from "./main/utils/log-cleanup";
 
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
@@ -384,6 +385,11 @@ async function initApplication(): Promise<void> {
 
   // UI初期化
   initUI({ showMainWindow: shouldShowMainWindow });
+
+  // Cleanup old log files (30+ days)
+  cleanupOldLogs().catch((err) =>
+    console.error("Log cleanup failed:", err),
+  );
 }
 
 app.on("ready", initApplication);

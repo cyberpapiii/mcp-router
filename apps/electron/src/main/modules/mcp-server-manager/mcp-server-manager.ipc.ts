@@ -2,6 +2,7 @@ import { ipcMain, dialog, BrowserWindow } from "electron";
 import { MCPServerConfig, CreateServerInput } from "@mcp_router/shared";
 import { processDxtFile } from "@/main/modules/mcp-server-manager/dxt-processor/dxt-processor";
 import type { MCPServerManager } from "@/main/modules/mcp-server-manager/mcp-server-manager";
+import { getEventBridge } from "../mcp-server-runtime/event-bridge";
 
 export function setupMcpServerHandlers(
   getMCPServerManager: () => MCPServerManager,
@@ -14,12 +15,22 @@ export function setupMcpServerHandlers(
   ipcMain.handle("mcp:start", async (_, id: string) => {
     const mcpServerManager = getMCPServerManager();
     const result = await mcpServerManager.startServer(id, "MCP Router UI");
+    getEventBridge().emit("servers_updated", {
+      action: "start",
+      serverId: id,
+      result,
+    });
     return result;
   });
 
   ipcMain.handle("mcp:stop", (_, id: string) => {
     const mcpServerManager = getMCPServerManager();
     const result = mcpServerManager.stopServer(id, "MCP Router UI");
+    getEventBridge().emit("servers_updated", {
+      action: "stop",
+      serverId: id,
+      result,
+    });
     return result;
   });
 
@@ -50,6 +61,11 @@ export function setupMcpServerHandlers(
         mcpServerManager.stopServer(server.id, undefined, false);
       }
 
+      getEventBridge().emit("servers_updated", {
+        action: "add",
+        serverId: server.id,
+        result: server,
+      });
       return server;
     } catch (error: any) {
       if (server && server?.id && server?.serverType !== "local") {
@@ -62,6 +78,11 @@ export function setupMcpServerHandlers(
   ipcMain.handle("mcp:remove", (_, id: string) => {
     const mcpServerManager = getMCPServerManager();
     const result = mcpServerManager.removeServer(id);
+    getEventBridge().emit("servers_updated", {
+      action: "remove",
+      serverId: id,
+      result,
+    });
     return result;
   });
 
@@ -83,7 +104,15 @@ export function setupMcpServerHandlers(
     "mcp:update-tool-permissions",
     (_, id: string, permissions: Record<string, boolean>) => {
       const mcpServerManager = getMCPServerManager();
-      return mcpServerManager.updateServerToolPermissions(id, permissions);
+      const result = mcpServerManager.updateServerToolPermissions(
+        id,
+        permissions,
+      );
+      getEventBridge().emit("tool_list_changed", {
+        serverId: id,
+        permissions,
+      });
+      return result;
     },
   );
 

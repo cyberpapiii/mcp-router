@@ -7,7 +7,7 @@ import type {
   DetailLevel,
 } from "@mcp_router/shared";
 import type { MCPServerManager } from "@/main/modules/mcp-server-manager/mcp-server-manager";
-import { BM25SearchProvider } from "./bm25-search-provider";
+import { MiniSearchProvider } from "./minisearch-provider";
 
 /**
  * Search request parameters for search providers.
@@ -33,7 +33,7 @@ type SearchContext = {
   toolCatalogEnabled?: boolean;
 };
 
-const DEFAULT_MAX_RESULTS = 20;
+const DEFAULT_MAX_RESULTS = 10; // Reduced from 20 for token efficiency
 const MAX_RESULTS_LIMIT = 100;
 
 export class ToolCatalogService {
@@ -45,7 +45,8 @@ export class ToolCatalogService {
     searchProvider?: SearchProvider,
   ) {
     this.serverManager = serverManager;
-    this.searchProvider = searchProvider ?? new BM25SearchProvider();
+    // Default to MiniSearch for better fuzzy matching and synonym support
+    this.searchProvider = searchProvider ?? new MiniSearchProvider();
   }
 
   /**
@@ -67,6 +68,7 @@ export class ToolCatalogService {
       return { results: [] };
     }
     const maxResults = this.normalizeMaxResults(request.maxResults);
+    const detailLevel = request.detailLevel || "summary";
 
     // Collect available tools on-demand
     const availableTools = await this.collectAvailableTools(context);
@@ -81,6 +83,7 @@ export class ToolCatalogService {
       context: request.context,
       tools: availableTools,
       maxResults,
+      detailLevel,
     });
 
     return { results };

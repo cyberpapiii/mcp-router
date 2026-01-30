@@ -218,9 +218,19 @@ export class ToolCatalogHandler extends RequestHandlerBase {
       // Check TTL
       if (Date.now() - entry.createdAt > TOOL_KEY_TTL_MS) {
         this.toolKeyMap.delete(toolKey);
-        throw new McpError(
+        throw this.createActionableError(
           ErrorCode.InvalidRequest,
+          "TOOLKEY_EXPIRED",
           `toolKey has expired: ${toolKey}`,
+          {
+            action: "Rediscover the tool",
+            steps: [
+              "Call tool_discovery with your original search query",
+              "Use the new toolKey from the response",
+              "Retry tool_execute with the fresh toolKey"
+            ],
+            hint: `toolKeys expire after ${TOOL_KEY_TTL_MINUTES} minutes to ensure you have current tool definitions`,
+          }
         );
       }
       return {
@@ -232,9 +242,19 @@ export class ToolCatalogHandler extends RequestHandlerBase {
     // Fallback: parse as legacy format (serverId:toolName)
     const separatorIndex = toolKey.indexOf(":");
     if (separatorIndex <= 0 || separatorIndex >= toolKey.length - 1) {
-      throw new McpError(
+      throw this.createActionableError(
         ErrorCode.InvalidRequest,
+        "TOOLKEY_INVALID",
         `Invalid toolKey format: ${toolKey}`,
+        {
+          action: "Verify the toolKey",
+          steps: [
+            "Ensure the toolKey matches exactly from tool_discovery results",
+            "toolKeys are UUIDs (e.g., '550e8400-e29b-41d4-a716-446655440000')",
+            "If unsure, call tool_discovery again to get a fresh toolKey"
+          ],
+          suggestedTools: ["tool_discovery"],
+        }
       );
     }
 
@@ -275,6 +295,36 @@ export class ToolCatalogHandler extends RequestHandlerBase {
       expiresInSeconds: TOOL_KEY_TTL_MINUTES * 60,
       ttlMinutes: TOOL_KEY_TTL_MINUTES,
     };
+  }
+
+  /**
+   * Create an actionable error with recovery hints.
+   */
+  private createActionableError(
+    code: ErrorCode,
+    type: string,
+    message: string,
+    recovery: {
+      action: string;
+      steps: string[];
+      hint?: string;
+      suggestedTools?: string[];
+    }
+  ): McpError {
+    const errorData = {
+      errorType: type,
+      recoveryAction: recovery.action,
+      recoverySteps: recovery.steps,
+      hint: recovery.hint,
+      suggestedTools: recovery.suggestedTools,
+    };
+
+    // Include recovery info in the message for LLMs that don't parse error data
+    const fullMessage = `${message}\n\nRECOVERY: ${recovery.action}\nSTEPS:\n${recovery.steps.map((s, i) => `${i + 1}. ${s}`).join('\n')}${recovery.hint ? `\n\nHINT: ${recovery.hint}` : ''}`;
+
+    const error = new McpError(code, fullMessage);
+    (error as any).data = errorData;
+    return error;
   }
 
   private getProjectOptimization(projectId: string | null) {
@@ -414,47 +464,108 @@ export class ToolCatalogHandler extends RequestHandlerBase {
     const { serverId, toolName } = this.parseToolKey(toolKey);
     const server = this.servers.get(serverId);
     if (!server) {
-      throw new McpError(
+      throw this.createActionableError(
         ErrorCode.InvalidRequest,
+        "SERVER_NOT_FOUND",
         `Unknown server: ${serverId}`,
+        {
+          action: "Verify the server exists",
+          steps: [
+            "Call tool_capabilities to see available servers",
+            "Call tool_discovery to find tools on available servers",
+            "Use a toolKey from the discovery results"
+          ],
+          suggestedTools: ["tool_capabilities", "tool_discovery"],
+        }
       );
     }
 
     const serverName = server.name || serverId;
 
     if (!this.tokenValidator.hasServerAccess(validatedToken, serverId)) {
-      throw new McpError(
+      throw this.createActionableError(
         ErrorCode.InvalidRequest,
+        "ACCESS_DENIED",
         "Token does not have access to this server",
+        {
+          action: "Check your access permissions",
+          steps: [
+            "Use tool_capabilities to see servers you have access to",
+            "Call tool_discovery to find accessible tools",
+            "Contact your administrator if you need access to additional servers"
+          ],
+          suggestedTools: ["tool_capabilities"],
+        }
       );
     }
 
     if (!this.toolCatalogService.matchesProject(server, projectId)) {
-      throw new McpError(
+      throw this.createActionableError(
         ErrorCode.InvalidRequest,
+        "PROJECT_MISMATCH",
         "Tool not available for the selected project",
+        {
+          action: "Use tools available in your current project",
+          steps: [
+            "Call tool_discovery to find tools in your current project",
+            "Switch to a different project if you need this tool",
+            "Check if the server is assigned to your project"
+          ],
+          suggestedTools: ["tool_discovery"],
+        }
       );
     }
 
     if (server.toolPermissions && server.toolPermissions[toolName] === false) {
-      throw new McpError(
+      throw this.createActionableError(
         ErrorCode.InvalidRequest,
+        "TOOL_DISABLED",
         `Tool "${toolName}" is disabled for this server`,
+        {
+          action: "Use an alternative tool or request access",
+          steps: [
+            "This tool has been disabled by an administrator",
+            "Call tool_discovery to find similar tools that are enabled",
+            "Contact your administrator if you need this specific tool"
+          ],
+          suggestedTools: ["tool_discovery"],
+        }
       );
     }
 
     const client = this.clients.get(serverId);
     if (!client) {
-      throw new McpError(
+      throw this.createActionableError(
         ErrorCode.InvalidRequest,
+        "SERVER_DISCONNECTED",
         `Server ${serverName} is not connected`,
+        {
+          action: "Wait for server to reconnect or use alternative",
+          steps: [
+            "The server may be temporarily unavailable",
+            "Try again in a few moments",
+            "Call tool_capabilities to see currently connected servers"
+          ],
+          hint: "Server connections are managed automatically and will reconnect when available",
+          suggestedTools: ["tool_capabilities"],
+        }
       );
     }
 
     if (!this.serverStatusMap.get(serverName)) {
-      throw new McpError(
+      throw this.createActionableError(
         ErrorCode.InvalidRequest,
+        "SERVER_NOT_RUNNING",
         `Server ${serverName} is not running`,
+        {
+          action: "Wait for server to start or use alternative",
+          steps: [
+            "The server may be starting up or temporarily stopped",
+            "Try again in a few moments",
+            "Call tool_capabilities to see currently running servers"
+          ],
+          suggestedTools: ["tool_capabilities"],
+        }
       );
     }
 

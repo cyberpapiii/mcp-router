@@ -13,6 +13,7 @@ export type TestFixtures = {
 };
 
 export const test = base.extend<TestFixtures>({
+  // eslint-disable-next-line no-empty-pattern
   electronApp: async ({}, use) => {
     // Launch electron app from webpack build
     const appPath = path.join(__dirname, "../../.webpack/arm64/main/index.js");

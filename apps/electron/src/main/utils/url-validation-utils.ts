@@ -50,7 +50,7 @@ export function validateExternalUrl(url: string): URLValidationResult {
     }
 
     return { isValid: true, normalizedUrl: parsed.toString() };
-  } catch (error) {
+  } catch (_error) {
     return { isValid: false, error: "Invalid URL format" };
   }
 }

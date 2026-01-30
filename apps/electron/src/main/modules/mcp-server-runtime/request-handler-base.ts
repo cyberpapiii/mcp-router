@@ -129,7 +129,7 @@ export abstract class RequestHandlerBase {
     serverName: string,
     requestType: string,
     handler: () => Promise<T>,
-    additionalMetadata?: Record<string, any>,
+    _additionalMetadata?: Record<string, any>,
   ): Promise<T> {
     // Create log entry
     const logEntry: RequestLogEntry = {

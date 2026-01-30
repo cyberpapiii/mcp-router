@@ -13,7 +13,7 @@ import { logError } from "@/main/utils/logger";
  * @template K - エンティティのIDの型（デフォルトはstring）
  * @template S - サービスクラス自身の型
  */
-export abstract class SingletonService<T, K = string, S = any> {
+export abstract class SingletonService<_T, _K = string, _S = any> {
   /**
    * シングルトンインスタンスを格納するMapオブジェクト
    * キー: サービスクラスのコンストラクタ

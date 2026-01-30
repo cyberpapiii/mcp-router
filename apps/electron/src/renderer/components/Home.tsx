@@ -179,7 +179,7 @@ const Home: React.FC = () => {
     try {
       await deleteServer(serverToDelete.id);
       toast.success(t("serverDetails.removeSuccess"));
-    } catch (error) {
+    } catch (_error) {
       toast.error(t("serverDetails.removeFailed"));
     } finally {
       setDeleteDialogOpen(false);

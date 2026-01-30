@@ -3,7 +3,7 @@ import { waitForAppReady } from "../utils/helpers";
 
 test.describe("App Launch", () => {
   test("should launch the application successfully", async ({
-    electronApp,
+    electronApp: _electronApp,
     page,
   }) => {
     // Wait for app to be ready
@@ -45,7 +45,7 @@ test.describe("App Launch", () => {
     let finalWindows: any[] = [];
     try {
       finalWindows = await electronApp.windows();
-    } catch (error) {
+    } catch (_error) {
       // App is closed, windows() will throw
       finalWindows = [];
     }

@@ -257,7 +257,7 @@ export class WorkflowExecutor {
   private async executeMcpCallNode(
     node: WorkflowNode,
     context: any,
-    previousResults: Record<string, any>,
+    _previousResults: Record<string, any>,
   ): Promise<any> {
     console.log(`Executing MCP call node: ${node.id}`);
 

@@ -376,7 +376,7 @@ export class MCPServerManager {
       server.status = "stopped";
       this.eventEmitter.emit("server-stopped", id);
       return true;
-    } catch (error) {
+    } catch (_error) {
       server.status = "error";
       return false;
     }

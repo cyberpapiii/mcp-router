@@ -136,6 +136,9 @@ export class ReconnectingMCPClient {
         // Ignore close errors
       }
 
+      // Check again after async operation (race condition guard)
+      if (this.disposed) return false;
+
       // Create new client and transport
       this.client = new Client({
         name: "mcp-router",

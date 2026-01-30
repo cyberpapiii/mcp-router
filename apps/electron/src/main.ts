@@ -387,9 +387,7 @@ async function initApplication(): Promise<void> {
   initUI({ showMainWindow: shouldShowMainWindow });
 
   // Cleanup old log files (30+ days)
-  cleanupOldLogs().catch((err) =>
-    console.error("Log cleanup failed:", err),
-  );
+  cleanupOldLogs().catch((err) => console.error("Log cleanup failed:", err));
 }
 
 app.on("ready", initApplication);

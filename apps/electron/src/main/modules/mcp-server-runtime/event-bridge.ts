@@ -1,12 +1,12 @@
 // apps/electron/src/main/modules/mcp-server-runtime/event-bridge.ts
 
 export type EventType =
-  | 'heartbeat'
-  | 'hub_state'
-  | 'servers_updated'
-  | 'tool_list_changed'
-  | 'resource_list_changed'
-  | 'config_changed';
+  | "heartbeat"
+  | "hub_state"
+  | "servers_updated"
+  | "tool_list_changed"
+  | "resource_list_changed"
+  | "config_changed";
 
 export interface BridgeEvent {
   type: EventType;
@@ -31,11 +31,11 @@ export class EventBridge {
       data,
       timestamp: new Date().toISOString(),
     };
-    this.subscribers.forEach(callback => {
+    this.subscribers.forEach((callback) => {
       try {
         callback(event);
       } catch (error) {
-        console.error('[EventBridge] Subscriber error:', error);
+        console.error("[EventBridge] Subscriber error:", error);
       }
     });
   }
@@ -43,7 +43,7 @@ export class EventBridge {
   startHeartbeat(intervalMs: number = 30000): void {
     this.stopHeartbeat();
     this.heartbeatInterval = setInterval(() => {
-      this.emit('heartbeat', { subscriberCount: this.subscribers.size });
+      this.emit("heartbeat", { subscriberCount: this.subscribers.size });
     }, intervalMs);
   }
 

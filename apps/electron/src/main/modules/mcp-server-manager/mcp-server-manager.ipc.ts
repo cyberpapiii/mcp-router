@@ -91,6 +91,7 @@ export function setupMcpServerHandlers(
     (_, id: string, config: Partial<MCPServerConfig>) => {
       const mcpServerManager = getMCPServerManager();
       const result = mcpServerManager.updateServer(id, config);
+      getEventBridge().emit("config_changed", { serverId: id, config });
       return result;
     },
   );

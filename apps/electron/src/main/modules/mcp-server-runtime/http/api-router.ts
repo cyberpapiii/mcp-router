@@ -117,7 +117,7 @@ export function createApiRouter(serverManager: MCPServerManager): Router {
       const options = {
         search: req.query.search as string,
         limit: req.query.limit
-          ? parseInt(req.query.limit as string)
+          ? parseInt(req.query.limit as string, 10)
           : undefined,
         cursor: req.query.cursor as string,
       };

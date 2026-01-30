@@ -71,7 +71,8 @@ export class MarketplaceService {
       try {
         const response = await fetch(url);
         if (response.ok) return response.text();
-      } catch {
+      } catch (error) {
+        console.debug(`[Marketplace] Failed to fetch README from ${branch}:`, error);
         continue;
       }
     }

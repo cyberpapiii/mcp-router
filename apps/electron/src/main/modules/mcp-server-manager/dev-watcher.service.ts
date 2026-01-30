@@ -51,6 +51,10 @@ export class DevWatcherService {
       this.handleChange(serverId, filePath);
     });
 
+    watcher.on("error", (error) => {
+      console.error(`[DevWatcher] Watcher error for ${serverId}:`, error);
+    });
+
     this.watchers.set(serverId, watcher);
     console.log(
       `[DevWatcher] Started watching ${patterns.length} patterns for ${serverId}`,

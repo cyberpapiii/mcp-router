@@ -24,6 +24,7 @@ import {
 } from "@/main/modules/settings/settings.service";
 import { getSkillService } from "@/main/modules/skills/skills.service";
 import { cleanupOldLogs } from "./main/utils/log-cleanup";
+import { logger } from "./main/utils/logger-factory";
 
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
@@ -387,7 +388,7 @@ async function initApplication(): Promise<void> {
   initUI({ showMainWindow: shouldShowMainWindow });
 
   // Cleanup old log files (30+ days)
-  cleanupOldLogs().catch((err) => console.error("Log cleanup failed:", err));
+  cleanupOldLogs().catch((err) => logger.error({ err }, "Log cleanup failed"));
 }
 
 app.on("ready", initApplication);

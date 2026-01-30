@@ -34,6 +34,16 @@ export interface MCPServerConfig {
   version?: string;
 
   toolPermissions?: MCPServerToolPermissions;
+
+  /** Development mode configuration for hot reload */
+  dev?: {
+    /** Enable dev mode with file watching */
+    enabled: boolean;
+    /** Glob patterns to watch for changes */
+    watch: string[];
+    /** Working directory for relative patterns */
+    cwd?: string;
+  };
 }
 
 export interface MCPTool {

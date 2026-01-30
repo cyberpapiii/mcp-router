@@ -233,10 +233,10 @@ export class ToolCatalogHandler extends RequestHandlerBase {
             steps: [
               "Call tool_discovery with your original search query",
               "Use the new toolKey from the response",
-              "Retry tool_execute with the fresh toolKey"
+              "Retry tool_execute with the fresh toolKey",
             ],
             hint: `toolKeys expire after ${TOOL_KEY_TTL_MINUTES} minutes to ensure you have current tool definitions`,
-          }
+          },
         );
       }
       return {
@@ -257,10 +257,10 @@ export class ToolCatalogHandler extends RequestHandlerBase {
           steps: [
             "Ensure the toolKey matches exactly from tool_discovery results",
             "toolKeys are UUIDs (e.g., '550e8400-e29b-41d4-a716-446655440000')",
-            "If unsure, call tool_discovery again to get a fresh toolKey"
+            "If unsure, call tool_discovery again to get a fresh toolKey",
           ],
           suggestedTools: ["tool_discovery"],
-        }
+        },
       );
     }
 
@@ -315,7 +315,7 @@ export class ToolCatalogHandler extends RequestHandlerBase {
       steps: string[];
       hint?: string;
       suggestedTools?: string[];
-    }
+    },
   ): McpError {
     const errorData = {
       errorType: type,
@@ -326,7 +326,7 @@ export class ToolCatalogHandler extends RequestHandlerBase {
     };
 
     // Include recovery info in the message for LLMs that don't parse error data
-    const fullMessage = `${message}\n\nRECOVERY: ${recovery.action}\nSTEPS:\n${recovery.steps.map((s, i) => `${i + 1}. ${s}`).join('\n')}${recovery.hint ? `\n\nHINT: ${recovery.hint}` : ''}`;
+    const fullMessage = `${message}\n\nRECOVERY: ${recovery.action}\nSTEPS:\n${recovery.steps.map((s, i) => `${i + 1}. ${s}`).join("\n")}${recovery.hint ? `\n\nHINT: ${recovery.hint}` : ""}`;
 
     const error = new McpError(code, fullMessage);
     (error as any).data = errorData;
@@ -479,10 +479,10 @@ export class ToolCatalogHandler extends RequestHandlerBase {
           steps: [
             "Call tool_capabilities to see available servers",
             "Call tool_discovery to find tools on available servers",
-            "Use a toolKey from the discovery results"
+            "Use a toolKey from the discovery results",
           ],
           suggestedTools: ["tool_capabilities", "tool_discovery"],
-        }
+        },
       );
     }
 
@@ -498,10 +498,10 @@ export class ToolCatalogHandler extends RequestHandlerBase {
           steps: [
             "Use tool_capabilities to see servers you have access to",
             "Call tool_discovery to find accessible tools",
-            "Contact your administrator if you need access to additional servers"
+            "Contact your administrator if you need access to additional servers",
           ],
           suggestedTools: ["tool_capabilities"],
-        }
+        },
       );
     }
 
@@ -515,10 +515,10 @@ export class ToolCatalogHandler extends RequestHandlerBase {
           steps: [
             "Call tool_discovery to find tools in your current project",
             "Switch to a different project if you need this tool",
-            "Check if the server is assigned to your project"
+            "Check if the server is assigned to your project",
           ],
           suggestedTools: ["tool_discovery"],
-        }
+        },
       );
     }
 
@@ -532,10 +532,10 @@ export class ToolCatalogHandler extends RequestHandlerBase {
           steps: [
             "This tool has been disabled by an administrator",
             "Call tool_discovery to find similar tools that are enabled",
-            "Contact your administrator if you need this specific tool"
+            "Contact your administrator if you need this specific tool",
           ],
           suggestedTools: ["tool_discovery"],
-        }
+        },
       );
     }
 
@@ -550,11 +550,11 @@ export class ToolCatalogHandler extends RequestHandlerBase {
           steps: [
             "The server may be temporarily unavailable",
             "Try again in a few moments",
-            "Call tool_capabilities to see currently connected servers"
+            "Call tool_capabilities to see currently connected servers",
           ],
           hint: "Server connections are managed automatically and will reconnect when available",
           suggestedTools: ["tool_capabilities"],
-        }
+        },
       );
     }
 
@@ -568,10 +568,10 @@ export class ToolCatalogHandler extends RequestHandlerBase {
           steps: [
             "The server may be starting up or temporarily stopped",
             "Try again in a few moments",
-            "Call tool_capabilities to see currently running servers"
+            "Call tool_capabilities to see currently running servers",
           ],
           suggestedTools: ["tool_capabilities"],
-        }
+        },
       );
     }
 
@@ -632,15 +632,23 @@ export class ToolCatalogHandler extends RequestHandlerBase {
         }
 
         // Collect tools to analyze
-        const { servers, clients, serverStatusMap } =
-          this.toolCatalogService.getServerManager().getMaps();
+        const { servers, clients, serverStatusMap } = this.toolCatalogService
+          .getServerManager()
+          .getMaps();
 
-        const serverInfos: ServerInfo[] = [];
         const categoryMap = new Map<
           string,
-          { tools: string[]; description: string }
+          { tools: string[]; count: number; description: string }
         >();
         let totalTools = 0;
+
+        // Build list of servers to query
+        const serversToQuery: Array<{
+          serverId: string;
+          server: MCPServer;
+          serverName: string;
+          client: ReconnectingMCPClient;
+        }> = [];
 
         for (const [serverId, server] of servers.entries()) {
           if (!allowedServerIds.has(serverId)) continue;
@@ -657,63 +665,111 @@ export class ToolCatalogHandler extends RequestHandlerBase {
           const client = clients.get(serverId);
           const isRunning = serverStatusMap.get(serverName) && !!client;
 
+          if (isRunning && client) {
+            serversToQuery.push({ serverId, server, serverName, client });
+          }
+        }
+
+        // Parallelize listTools() calls with Promise.allSettled()
+        const toolResponses = await Promise.allSettled(
+          serversToQuery.map(async ({ serverId, server, serverName, client }) => {
+            const toolResponse = await client.getClient().listTools();
+            return { serverId, server, serverName, tools: toolResponse?.tools ?? [] };
+          })
+        );
+
+        // Process results
+        const serverInfos: ServerInfo[] = [];
+
+        // First, add servers that were queried (running)
+        for (let i = 0; i < serversToQuery.length; i++) {
+          const { serverId, server, serverName } = serversToQuery[i];
+          const result = toolResponses[i];
+
           const serverCategories = new Set<string>();
           let serverToolCount = 0;
 
-          if (isRunning && client) {
-            try {
-              const toolResponse = await client.getClient().listTools();
-              const tools = toolResponse?.tools ?? [];
+          if (result.status === "fulfilled") {
+            const tools = result.value.tools;
 
-              for (const tool of tools) {
-                if (server.toolPermissions?.[tool.name] === false) continue;
+            for (const tool of tools) {
+              if (server.toolPermissions?.[tool.name] === false) continue;
 
-                serverToolCount++;
-                totalTools++;
+              serverToolCount++;
+              totalTools++;
 
-                // Infer category from tool name/description
-                const category = this.inferCategory(
-                  tool.name,
-                  tool.description || "",
-                );
-                serverCategories.add(category);
+              // Infer category from tool name/description
+              const category = this.inferCategory(
+                tool.name,
+                tool.description || "",
+              );
+              serverCategories.add(category);
 
-                if (!filterCategory || category === filterCategory) {
-                  if (!categoryMap.has(category)) {
-                    categoryMap.set(category, {
-                      tools: [],
-                      description: this.getCategoryDescription(category),
-                    });
-                  }
-                  const cat = categoryMap.get(category)!;
-                  if (cat.tools.length < 3) {
-                    // Keep only 3 examples
-                    cat.tools.push(tool.name);
-                  }
+              if (!filterCategory || category === filterCategory) {
+                if (!categoryMap.has(category)) {
+                  categoryMap.set(category, {
+                    tools: [],
+                    count: 0,
+                    description: this.getCategoryDescription(category),
+                  });
+                }
+                const cat = categoryMap.get(category)!;
+                cat.count++;
+                if (cat.tools.length < 3) {
+                  // Keep only 3 examples
+                  cat.tools.push(tool.name);
                 }
               }
-            } catch (error) {
-              console.error(
-                `[ToolCapabilities] Failed to list tools from ${serverName}:`,
-                error,
-              );
             }
+          } else {
+            console.error(
+              `[ToolCapabilities] Failed to list tools from ${serverName}:`,
+              result.reason,
+            );
           }
 
           serverInfos.push({
             name: serverName,
             serverId,
             toolCount: serverToolCount,
-            status: isRunning ? "running" : "stopped",
+            status: "running",
             categories: Array.from(serverCategories),
           });
+        }
+
+        // Add stopped servers (those not in serversToQuery but match filters)
+        for (const [serverId, server] of servers.entries()) {
+          if (!allowedServerIds.has(serverId)) continue;
+          if (!this.toolCatalogService.matchesProject(server, projectId))
+            continue;
+          if (
+            filterServer &&
+            server.name !== filterServer &&
+            serverId !== filterServer
+          )
+            continue;
+
+          const serverName = server.name || serverId;
+          const client = clients.get(serverId);
+          const isRunning = serverStatusMap.get(serverName) && !!client;
+
+          // Only add if not already added (i.e., it was stopped)
+          if (!isRunning) {
+            serverInfos.push({
+              name: serverName,
+              serverId,
+              toolCount: 0,
+              status: "stopped",
+              categories: [],
+            });
+          }
         }
 
         const categories: CategoryInfo[] = Array.from(categoryMap.entries())
           .map(([name, data]) => ({
             name,
             description: data.description,
-            toolCount: data.tools.length,
+            toolCount: data.count,
             examples: data.tools,
           }))
           .sort((a, b) => b.toolCount - a.toolCount);

@@ -111,11 +111,15 @@ export class RequestHandlers extends RequestHandlerBase {
   }
 
   /**
-   * Check if tool catalog is enabled for the given project
+   * Check if tool catalog is enabled for the given project.
+   * Catalog mode is now the DEFAULT - exposes meta-tools (tool_discovery,
+   * tool_execute, tool_capabilities) instead of all tools directly.
+   * This provides better token efficiency and works within client tool limits.
    */
-  private isToolCatalogEnabled(projectId: string | null): boolean {
-    const optimization = this.getProjectOptimization(projectId);
-    return !!optimization;
+  private isToolCatalogEnabled(_projectId: string | null): boolean {
+    // Catalog mode is now always enabled by default
+    // This exposes only meta-tools, with actual tools accessed via tool_discovery/tool_execute
+    return true;
   }
 
   /**

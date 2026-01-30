@@ -118,6 +118,13 @@ export class MainDatabaseMigration {
       description: "Add agent_paths table for custom symlink targets",
       execute: (db) => this.migrateAddAgentPathsTable(db),
     });
+
+    // Dev column for hot reload configuration
+    this.migrations.push({
+      id: "20260130_add_dev_column",
+      description: "Add dev column to servers table for hot reload config",
+      execute: (db) => this.migrateAddDevColumn(db),
+    });
   }
 
   /**
@@ -676,6 +683,37 @@ export class MainDatabaseMigration {
       console.log("Default agent paths inserted");
     } catch (error) {
       console.error("Error while creating agent_paths table:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * dev列を追加するマイグレーション（ホットリロード設定用）
+   */
+  private migrateAddDevColumn(db: SqliteManager): void {
+    try {
+      const tableExists = db.get(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name = 'servers'",
+        {},
+      );
+
+      if (!tableExists) {
+        console.log("servers table does not exist, skipping this migration");
+        return;
+      }
+
+      const tableInfo = db.all("PRAGMA table_info(servers)");
+      const columnNames = tableInfo.map((col: any) => col.name);
+
+      if (!columnNames.includes("dev")) {
+        console.log("Adding dev column to servers");
+        db.execute("ALTER TABLE servers ADD COLUMN dev TEXT");
+        console.log("dev column added");
+      } else {
+        console.log("dev column already exists, skipping");
+      }
+    } catch (error) {
+      console.error("Error while adding dev column:", error);
       throw error;
     }
   }

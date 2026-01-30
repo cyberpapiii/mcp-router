@@ -37,6 +37,7 @@ export class McpServerManagerRepository extends BaseRepository<MCPServer> {
       required_params TEXT,
       project_id TEXT,
       tool_permissions TEXT,
+      dev TEXT,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     )
@@ -160,6 +161,11 @@ export class McpServerManagerRepository extends BaseRepository<MCPServer> {
         "ツール権限",
         {},
       );
+      const dev = this.safeParseJSON<{
+        enabled: boolean;
+        watch: string[];
+        cwd?: string;
+      } | undefined>(row.dev, "dev設定", undefined);
 
       // エンティティオブジェクトを構築
       return {
@@ -181,6 +187,7 @@ export class McpServerManagerRepository extends BaseRepository<MCPServer> {
         required: requiredParams,
         projectId: row.project_id || null,
         toolPermissions,
+        dev,
         status: "stopped",
         logs: [],
       };
@@ -208,6 +215,7 @@ export class McpServerManagerRepository extends BaseRepository<MCPServer> {
       command: entity.command || null,
       args: JSON.stringify(entity.args || []),
       remoteUrl: entity.remoteUrl || null,
+      dev: entity.dev ? JSON.stringify(entity.dev) : null,
     };
   }
 
@@ -227,6 +235,7 @@ export class McpServerManagerRepository extends BaseRepository<MCPServer> {
         args,
         remoteUrl,
         toolPermissions,
+        dev,
       } = this.serializeEntityData(entity);
 
       // DB行オブジェクトを構築
@@ -245,6 +254,7 @@ export class McpServerManagerRepository extends BaseRepository<MCPServer> {
         input_params: inputParams,
         project_id: entity.projectId ?? null,
         tool_permissions: toolPermissions,
+        dev: dev,
         description: entity.description || null,
         version: entity.version || null,
         latest_version: entity.latestVersion || null,
@@ -334,6 +344,7 @@ export class McpServerManagerRepository extends BaseRepository<MCPServer> {
         args,
         remoteUrl,
         toolPermissions,
+        dev,
       } = this.serializeEntityData(entity);
 
       // DB行オブジェクトを構築
@@ -352,6 +363,7 @@ export class McpServerManagerRepository extends BaseRepository<MCPServer> {
         input_params: inputParams,
         project_id: entity.projectId ?? null,
         tool_permissions: toolPermissions,
+        dev: dev,
         description: entity.description || null,
         version: entity.version || null,
         latest_version: entity.latestVersion || null,

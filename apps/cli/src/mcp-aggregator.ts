@@ -78,6 +78,48 @@ export class MCPAggregator {
   }
 
   /**
+   * Handle client reconnection - refresh tool mappings
+   */
+  public async handleClientReconnected(id: string): Promise<void> {
+    const serverClient = this.clients.get(id);
+    if (!serverClient) {
+      console.warn(
+        `[MCPAggregator] Cannot refresh tools - client ${id} not found`,
+      );
+      return;
+    }
+
+    try {
+      // Clear old tool mappings for this server
+      for (const [toolName, serverId] of this.toolToServerMap) {
+        if (serverId === id) {
+          this.toolToServerMap.delete(toolName);
+        }
+      }
+
+      // Fetch fresh tools
+      const response = await serverClient.client.listTools();
+      if (response && Array.isArray(response.tools)) {
+        for (const tool of response.tools) {
+          const toolName = this.prefixToolNames
+            ? prefixToolName(serverClient.name, tool.name)
+            : tool.name;
+          this.toolToServerMap.set(toolName, id);
+        }
+      }
+
+      console.log(
+        `[MCPAggregator] Refreshed tools for reconnected client ${serverClient.name}`,
+      );
+    } catch (error) {
+      console.error(
+        `[MCPAggregator] Failed to refresh tools for ${serverClient.name}:`,
+        error,
+      );
+    }
+  }
+
+  /**
    * Set up request handlers
    */
   private setupRequestHandlers(): void {

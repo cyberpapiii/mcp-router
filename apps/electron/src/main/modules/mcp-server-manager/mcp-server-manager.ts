@@ -293,8 +293,6 @@ export class MCPServerManager {
     }
 
     this.clients.set(id, result.client);
-    server.status = "running";
-    server.errorMessage = undefined;
 
     // Register the client
     this.serverStatusMap.set(server.name, true);
@@ -313,8 +311,6 @@ export class MCPServerManager {
       duration: 0,
       clientId: clientId || "unknownClient",
     });
-
-    this.eventEmitter.emit("server-started", id);
 
     // Check for dev mode and start file watcher if enabled
     if (server.dev?.enabled && server.dev.watch?.length > 0) {

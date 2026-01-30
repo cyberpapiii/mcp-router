@@ -1,24 +1,51 @@
-/**
- * エラーハンドリングとログ出力のためのユーティリティ
- */
-
-import { isDevelopment } from "./environment";
+// apps/electron/src/main/utils/logger.ts
+import { logger } from "./logger-factory";
 
 /**
- * INFO レベルのログを出力
- * @param args ログに出力する任意の引数
+ * INFO level log
  */
-export function logInfo(...args: any[]): void {
-  if (isDevelopment()) {
-    console.log("[INFO]", JSON.stringify(args));
+export function logInfo(...args: unknown[]): void {
+  if (args.length === 1) {
+    logger.info(args[0]);
+  } else {
+    logger.info({ data: args }, String(args[0]));
   }
 }
 
 /**
- * ERROR レベルのログを出力
- * @param args ログに出力する任意の引数
+ * ERROR level log
  */
-export function logError(...args: any[]): void {
-  // エラーログは本番環境でも出力する
-  console.error("[ERROR]", ...args);
+export function logError(...args: unknown[]): void {
+  if (args.length === 1 && args[0] instanceof Error) {
+    logger.error({ err: args[0] }, args[0].message);
+  } else if (args.length === 1) {
+    logger.error(args[0]);
+  } else {
+    logger.error({ data: args }, String(args[0]));
+  }
 }
+
+/**
+ * WARN level log
+ */
+export function logWarn(...args: unknown[]): void {
+  if (args.length === 1) {
+    logger.warn(args[0]);
+  } else {
+    logger.warn({ data: args }, String(args[0]));
+  }
+}
+
+/**
+ * DEBUG level log
+ */
+export function logDebug(...args: unknown[]): void {
+  if (args.length === 1) {
+    logger.debug(args[0]);
+  } else {
+    logger.debug({ data: args }, String(args[0]));
+  }
+}
+
+// Export logger for direct use
+export { logger };

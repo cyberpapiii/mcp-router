@@ -161,11 +161,14 @@ export class McpServerManagerRepository extends BaseRepository<MCPServer> {
         "ツール権限",
         {},
       );
-      const dev = this.safeParseJSON<{
-        enabled: boolean;
-        watch: string[];
-        cwd?: string;
-      } | undefined>(row.dev, "dev設定", undefined);
+      const dev = this.safeParseJSON<
+        | {
+            enabled: boolean;
+            watch: string[];
+            cwd?: string;
+          }
+        | undefined
+      >(row.dev, "dev設定", undefined);
 
       // エンティティオブジェクトを構築
       return {

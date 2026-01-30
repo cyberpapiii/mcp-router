@@ -164,4 +164,8 @@ export class ToolCatalogService {
     const serverProject = server?.projectId ?? null;
     return projectId === null || serverProject === projectId;
   }
+
+  public getServerManager(): MCPServerManager {
+    return this.serverManager;
+  }
 }

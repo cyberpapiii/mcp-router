@@ -29,7 +29,7 @@ export interface ToolInfo {
  * - summary: + truncated description (~20 tokens/tool)
  * - full: + inputSchema, outputSchema, annotations (~100+ tokens/tool)
  */
-export type DetailLevel = 'minimal' | 'summary' | 'full';
+export type DetailLevel = "minimal" | "summary" | "full";
 
 /**
  * Expiration metadata for tool discovery responses.
@@ -59,9 +59,9 @@ export interface SearchResult {
   relevance?: number; // 0-1 normalized score
   // full level only
   explanation?: string;
-  inputSchema?: ToolInfo['inputSchema'];
+  inputSchema?: ToolInfo["inputSchema"];
   outputSchema?: any;
-  annotations?: ToolInfo['annotations'];
+  annotations?: ToolInfo["annotations"];
 }
 
 export interface SearchResponse {
@@ -77,4 +77,34 @@ export interface SearchResponseMetadata {
 
 export interface SearchResponseWithMetadata extends SearchResponse {
   metadata: SearchResponseMetadata;
+}
+
+/**
+ * Category information for tool_capabilities.
+ */
+export interface CategoryInfo {
+  name: string;
+  description: string;
+  toolCount: number;
+  examples: string[]; // Example tool names (not keys)
+}
+
+/**
+ * Server information for tool_capabilities.
+ */
+export interface ServerInfo {
+  name: string;
+  serverId: string;
+  toolCount: number;
+  status: "running" | "stopped" | "error";
+  categories: string[];
+}
+
+/**
+ * Response from tool_capabilities.
+ */
+export interface ToolCapabilitiesResponse {
+  totalTools: number;
+  categories: CategoryInfo[];
+  servers: ServerInfo[];
 }

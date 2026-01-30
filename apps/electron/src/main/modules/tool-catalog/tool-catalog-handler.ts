@@ -6,7 +6,13 @@ import {
   MCPTool,
   UNASSIGNED_PROJECT_ID,
 } from "@mcp_router/shared";
-import type { DetailLevel, ExpirationMetadata } from "@mcp_router/shared";
+import type {
+  DetailLevel,
+  ExpirationMetadata,
+  ServerInfo,
+  CategoryInfo,
+  ToolCapabilitiesResponse,
+} from "@mcp_router/shared";
 import { TokenValidator } from "@/main/modules/mcp-server-runtime/token-validator";
 import { RequestHandlerBase } from "@/main/modules/mcp-server-runtime/request-handler-base";
 import { getProjectService } from "@/main/modules/projects/projects.service";
@@ -594,5 +600,191 @@ export class ToolCatalogHandler extends RequestHandlerBase {
       },
       { serverId },
     );
+  }
+
+  /**
+   * Handle tool_capabilities request.
+   * Returns high-level overview of available categories and servers.
+   */
+  public async handleToolCapabilities(request: any): Promise<any> {
+    const token = request.params._meta?.token as string | undefined;
+    const projectId = this.normalizeProjectId(request.params._meta?.projectId);
+    const { clientId, token: validatedToken } = this.requireValidToken(token);
+
+    const args = request.params.arguments || {};
+    const filterServer =
+      typeof args.server === "string" ? args.server : undefined;
+    const filterCategory =
+      typeof args.category === "string" ? args.category : undefined;
+
+    return await this.executeWithHooksAndLogging(
+      "tools/capabilities",
+      { server: filterServer, category: filterCategory },
+      clientId,
+      AGGREGATOR_SERVER_NAME,
+      "ToolCapabilities",
+      async () => {
+        const allowedServerIds = new Set<string>();
+        for (const serverId of this.servers.keys()) {
+          if (this.tokenValidator.hasServerAccess(validatedToken, serverId)) {
+            allowedServerIds.add(serverId);
+          }
+        }
+
+        // Collect tools to analyze
+        const { servers, clients, serverStatusMap } =
+          this.toolCatalogService.getServerManager().getMaps();
+
+        const serverInfos: ServerInfo[] = [];
+        const categoryMap = new Map<
+          string,
+          { tools: string[]; description: string }
+        >();
+        let totalTools = 0;
+
+        for (const [serverId, server] of servers.entries()) {
+          if (!allowedServerIds.has(serverId)) continue;
+          if (!this.toolCatalogService.matchesProject(server, projectId))
+            continue;
+          if (
+            filterServer &&
+            server.name !== filterServer &&
+            serverId !== filterServer
+          )
+            continue;
+
+          const serverName = server.name || serverId;
+          const client = clients.get(serverId);
+          const isRunning = serverStatusMap.get(serverName) && !!client;
+
+          const serverCategories = new Set<string>();
+          let serverToolCount = 0;
+
+          if (isRunning && client) {
+            try {
+              const toolResponse = await client.getClient().listTools();
+              const tools = toolResponse?.tools ?? [];
+
+              for (const tool of tools) {
+                if (server.toolPermissions?.[tool.name] === false) continue;
+
+                serverToolCount++;
+                totalTools++;
+
+                // Infer category from tool name/description
+                const category = this.inferCategory(
+                  tool.name,
+                  tool.description || "",
+                );
+                serverCategories.add(category);
+
+                if (!filterCategory || category === filterCategory) {
+                  if (!categoryMap.has(category)) {
+                    categoryMap.set(category, {
+                      tools: [],
+                      description: this.getCategoryDescription(category),
+                    });
+                  }
+                  const cat = categoryMap.get(category)!;
+                  if (cat.tools.length < 3) {
+                    // Keep only 3 examples
+                    cat.tools.push(tool.name);
+                  }
+                }
+              }
+            } catch (error) {
+              console.error(
+                `[ToolCapabilities] Failed to list tools from ${serverName}:`,
+                error,
+              );
+            }
+          }
+
+          serverInfos.push({
+            name: serverName,
+            serverId,
+            toolCount: serverToolCount,
+            status: isRunning ? "running" : "stopped",
+            categories: Array.from(serverCategories),
+          });
+        }
+
+        const categories: CategoryInfo[] = Array.from(categoryMap.entries())
+          .map(([name, data]) => ({
+            name,
+            description: data.description,
+            toolCount: data.tools.length,
+            examples: data.tools,
+          }))
+          .sort((a, b) => b.toolCount - a.toolCount);
+
+        const response: ToolCapabilitiesResponse = {
+          totalTools,
+          categories,
+          servers: serverInfos.sort((a, b) => b.toolCount - a.toolCount),
+        };
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(response, null, 2),
+            },
+          ],
+        };
+      },
+    );
+  }
+
+  /**
+   * Infer category from tool name and description.
+   */
+  private inferCategory(toolName: string, description: string): string {
+    const text = `${toolName} ${description}`.toLowerCase();
+
+    const categoryPatterns: [string, RegExp][] = [
+      ["file_operations", /file|read|write|directory|folder|path|fs/],
+      ["git", /git|commit|branch|merge|push|pull|clone|diff/],
+      ["github", /github|issue|pull.?request|pr|repo|gist/],
+      ["messaging", /message|chat|slack|send|channel|dm/],
+      ["calendar", /calendar|event|schedule|meeting|appointment/],
+      ["email", /email|mail|inbox|send.*mail/],
+      ["database", /database|db|query|sql|table|record/],
+      ["api", /api|http|request|endpoint|rest|fetch/],
+      ["shell", /shell|bash|terminal|command|exec|run/],
+      ["search", /search|find|query|lookup|filter/],
+      ["auth", /auth|login|token|password|credential/],
+      ["notification", /notification|notify|alert|push/],
+    ];
+
+    for (const [category, pattern] of categoryPatterns) {
+      if (pattern.test(text)) {
+        return category;
+      }
+    }
+
+    return "other";
+  }
+
+  /**
+   * Get description for a category.
+   */
+  private getCategoryDescription(category: string): string {
+    const descriptions: Record<string, string> = {
+      file_operations: "Read, write, and manipulate files and directories",
+      git: "Version control operations (commit, branch, merge)",
+      github: "GitHub-specific operations (issues, PRs, repos)",
+      messaging: "Send and receive messages (Slack, chat)",
+      calendar: "Calendar and scheduling operations",
+      email: "Email sending and management",
+      database: "Database queries and operations",
+      api: "HTTP/REST API interactions",
+      shell: "Shell command execution",
+      search: "Search and find operations",
+      auth: "Authentication and authorization",
+      notification: "Push notifications and alerts",
+      other: "Other tools",
+    };
+    return descriptions[category] || "Miscellaneous tools";
   }
 }

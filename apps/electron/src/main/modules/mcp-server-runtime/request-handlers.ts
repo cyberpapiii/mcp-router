@@ -156,13 +156,17 @@ export class RequestHandlers extends RequestHandlerBase {
     const toolName = request.params.name;
     const projectId = this.normalizeProjectId(request.params._meta?.projectId);
 
-    // Always handle META_TOOLS (tool_discovery, tool_execute) regardless of catalog mode
+    // Always handle META_TOOLS (tool_discovery, tool_execute, tool_capabilities) regardless of catalog mode
     if (toolName === "tool_discovery") {
       return await this.toolCatalogHandler.handleToolDiscovery(request);
     }
 
     if (toolName === "tool_execute") {
       return await this.toolCatalogHandler.handleToolExecute(request);
+    }
+
+    if (toolName === "tool_capabilities") {
+      return await this.toolCatalogHandler.handleToolCapabilities(request);
     }
 
     // If tool catalog is enabled, only META_TOOLS are available

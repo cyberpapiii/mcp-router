@@ -13,6 +13,7 @@ import {
   substituteArgsParameters,
 } from "../mcp-apps-manager/mcp-apps-manager.service";
 import { getLogService } from "@/main/modules/mcp-logger/mcp-logger.service";
+import { DevWatcherService } from "./dev-watcher.service";
 
 /**
  * Core server lifecycle management
@@ -25,6 +26,7 @@ export class MCPServerManager {
   private serversDir: string;
   private serverService!: ServerService;
   private eventEmitter = new EventEmitter();
+  private devWatcher: DevWatcherService;
 
   constructor() {
     this.serversDir = path.join(app.getPath("userData"), "mcp-servers");
@@ -33,6 +35,12 @@ export class MCPServerManager {
     }
     // Set server name to ID map for log service
     getLogService().setServerNameToIdMap(this.serverNameToIdMap);
+
+    // Initialize dev watcher for hot reload support
+    this.devWatcher = new DevWatcherService(async (serverId) => {
+      console.log(`[MCPServerManager] Hot reloading server ${serverId}`);
+      await this.restartServer(serverId);
+    });
   }
 
   /**
@@ -305,6 +313,12 @@ export class MCPServerManager {
 
     this.eventEmitter.emit("server-started", id);
 
+    // Check for dev mode and start file watcher if enabled
+    if (server.dev?.enabled && server.dev.watch?.length > 0) {
+      const cwd = server.dev.cwd || process.cwd();
+      await this.devWatcher.startWatching(id, server.dev.watch, cwd);
+    }
+
     return true;
   }
 
@@ -329,6 +343,14 @@ export class MCPServerManager {
 
     try {
       server.status = "stopping";
+
+      // Stop dev watcher if running (fire-and-forget to maintain sync signature)
+      this.devWatcher.stopWatching(id).catch((err) => {
+        console.error(
+          `[MCPServerManager] Failed to stop dev watcher for ${id}:`,
+          err,
+        );
+      });
 
       // Unregister the client
       this.serverStatusMap.set(server.name, false);
@@ -358,6 +380,19 @@ export class MCPServerManager {
       server.status = "error";
       return false;
     }
+  }
+
+  /**
+   * Restart an MCP server (used by DevWatcher for hot reload)
+   */
+  public async restartServer(serverId: string): Promise<void> {
+    const server = this.servers.get(serverId);
+    if (!server) {
+      throw new Error(`Server ${serverId} not found`);
+    }
+
+    this.stopServer(serverId, "DevWatcher", false);
+    await this.startServer(serverId, "DevWatcher", false);
   }
 
   /**
@@ -527,6 +562,9 @@ export class MCPServerManager {
    * Shutdown all servers
    */
   public async shutdown(): Promise<void> {
+    // Stop all dev watchers first
+    await this.devWatcher.stopAll();
+
     for (const [id] of this.clients) {
       // Don't persist state changes when shutting down - this is just cleanup
       this.stopServer(id, undefined, false);

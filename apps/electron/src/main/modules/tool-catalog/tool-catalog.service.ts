@@ -116,7 +116,7 @@ export class ToolCatalogService {
       const permissions = server.toolPermissions || {};
 
       try {
-        const toolResponse = await client.listTools();
+        const toolResponse = await client.getClient().listTools();
         const toolList = toolResponse?.tools ?? [];
 
         for (const tool of toolList) {

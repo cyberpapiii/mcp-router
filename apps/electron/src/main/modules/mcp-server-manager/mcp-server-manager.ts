@@ -7,20 +7,23 @@ import {
   getServerService,
   ServerService,
 } from "@/main/modules/mcp-server-manager/server-service";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import {
-  connectToMCPServer,
-  substituteArgsParameters,
-} from "../mcp-apps-manager/mcp-apps-manager.service";
+import { substituteArgsParameters } from "../mcp-apps-manager/mcp-apps-manager.service";
 import { getLogService } from "@/main/modules/mcp-logger/mcp-logger.service";
 import { DevWatcherService } from "./dev-watcher.service";
+import { ReconnectingMCPClient } from "./reconnecting-mcp-client";
+import { ConnectionState } from "./connection-monitor";
+import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
+import { getUserShellEnv } from "@/main/utils/env-utils";
 
 /**
  * Core server lifecycle management
  */
 export class MCPServerManager {
   private servers: Map<string, MCPServer> = new Map();
-  private clients: Map<string, Client> = new Map();
+  private clients: Map<string, ReconnectingMCPClient> = new Map();
   private serverNameToIdMap: Map<string, string> = new Map();
   private serverStatusMap: Map<string, boolean> = new Map();
   private serversDir: string;
@@ -371,7 +374,7 @@ export class MCPServerManager {
       });
 
       // Disconnect the client
-      client.close();
+      client.dispose();
       this.clients.delete(id);
       server.status = "stopped";
       this.eventEmitter.emit("server-stopped", id);
@@ -479,7 +482,7 @@ export class MCPServerManager {
       throw new Error("Server must be running to list tools");
     }
 
-    const response = await client.listTools();
+    const response = await client.getClient().listTools();
     const tools = response?.tools ?? [];
     const permissions = server.toolPermissions || {};
     const toolsWithStatus = tools.map((tool) => ({
@@ -507,7 +510,8 @@ export class MCPServerManager {
   private async connectToServerWithResult(
     id: string,
   ): Promise<
-    { status: "success"; client: Client } | { status: "error"; error: string }
+    | { status: "success"; client: ReconnectingMCPClient }
+    | { status: "error"; error: string }
   > {
     const server = this.servers.get(id);
     if (!server) {
@@ -515,34 +519,146 @@ export class MCPServerManager {
     }
 
     try {
-      const result = await connectToMCPServer(
-        {
-          id: server.id,
-          name: server.name,
-          serverType: server.serverType,
-          command: server.command,
-          args: server.args
-            ? substituteArgsParameters(
-                server.args,
-                server.env || {},
-                server.inputParams || {},
-              )
-            : undefined,
-          remoteUrl: server.remoteUrl,
-          bearerToken: server.bearerToken,
-          env: server.env,
-          inputParams: server.inputParams,
-        },
-        "mcp-router",
-      );
+      const createTransport = () => this.createTransportForServer(server);
 
-      return result;
+      // Determine health check URL for HTTP transports
+      let healthCheckUrl: string | undefined;
+      if (server.serverType === "remote-streamable" && server.remoteUrl) {
+        const url = new URL(server.remoteUrl);
+        url.pathname = url.pathname.replace(/\/mcp$/, "/api/test");
+        healthCheckUrl = url.toString();
+      }
+
+      const reconnectingClient = new ReconnectingMCPClient({
+        serverId: server.id,
+        serverName: server.name,
+        createTransport,
+        onStatusChange: (state) =>
+          this.handleConnectionStateChange(server.id, state),
+        healthCheckUrl,
+        healthCheckIntervalMs: 30000,
+        bearerToken: server.bearerToken,
+        maxRetries: 5,
+        initialDelayMs: 1000,
+        maxDelayMs: 30000,
+      });
+
+      await reconnectingClient.connect();
+
+      return { status: "success", client: reconnectingClient };
     } catch (error) {
       return {
         status: "error",
         error:
           error instanceof Error ? error.message : "Unknown error occurred",
       };
+    }
+  }
+
+  /**
+   * Create transport for a server based on its type
+   */
+  private createTransportForServer(server: MCPServer): Transport {
+    if (server.serverType === "remote-streamable") {
+      if (!server.remoteUrl) {
+        throw new Error("remoteUrl required for remote-streamable server");
+      }
+      return new StreamableHTTPClientTransport(new URL(server.remoteUrl), {
+        sessionId: undefined,
+        requestInit: {
+          headers: {
+            authorization: server.bearerToken
+              ? `Bearer ${server.bearerToken}`
+              : "",
+          },
+        },
+      });
+    } else if (server.serverType === "remote") {
+      if (!server.remoteUrl) {
+        throw new Error("remoteUrl required for remote server");
+      }
+      const headers: Record<string, string> = {
+        Accept: "text/event-stream",
+      };
+      if (server.bearerToken) {
+        headers["authorization"] = `Bearer ${server.bearerToken}`;
+      }
+      return new SSEClientTransport(new URL(server.remoteUrl), {
+        eventSourceInit: {
+          fetch: (url, init) => fetch(url, { ...init, headers }),
+        },
+        requestInit: { headers },
+      });
+    } else if (server.serverType === "local") {
+      if (!server.command) {
+        throw new Error("command required for local server");
+      }
+      return new StdioClientTransport({
+        command: server.command,
+        args: server.args
+          ? substituteArgsParameters(
+              server.args,
+              server.env || {},
+              server.inputParams || {},
+            )
+          : undefined,
+        env: this.getMergedEnv(server),
+      });
+    }
+    throw new Error(`Unsupported server type: ${server.serverType}`);
+  }
+
+  /**
+   * Get merged environment variables for a server
+   */
+  private getMergedEnv(server: MCPServer): Record<string, string> {
+    const userEnvs = getUserShellEnv();
+    const cleanUserEnvs = Object.entries(userEnvs).reduce(
+      (acc, [key, value]) => {
+        if (value !== undefined) {
+          acc[key] = value as string;
+        }
+        return acc;
+      },
+      {} as Record<string, string>,
+    );
+    return { ...cleanUserEnvs, ...server.env };
+  }
+
+  /**
+   * Handle connection state changes from ReconnectingMCPClient
+   */
+  private handleConnectionStateChange(
+    serverId: string,
+    state: ConnectionState,
+  ): void {
+    const server = this.servers.get(serverId);
+    if (!server) return;
+
+    // Map ConnectionState to MCPServer status
+    switch (state) {
+      case "connected":
+        server.status = "running";
+        server.errorMessage = undefined;
+        this.eventEmitter.emit("server-started", serverId);
+        break;
+      case "connecting":
+        server.status = "starting";
+        break;
+      case "reconnecting":
+        server.status = "starting";
+        server.errorMessage = "Reconnecting...";
+        this.eventEmitter.emit("server-updated", serverId);
+        break;
+      case "disconnected":
+        server.status = "stopped";
+        this.eventEmitter.emit("server-stopped", serverId);
+        break;
+      case "failed":
+        server.status = "error";
+        server.errorMessage = "Connection failed after max retries";
+        this.eventEmitter.emit("server-stopped", serverId);
+        break;
     }
   }
 

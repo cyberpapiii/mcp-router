@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import {
   AGGREGATOR_SERVER_NAME,
   MCPServer,
@@ -12,6 +11,7 @@ import { RequestHandlerBase } from "@/main/modules/mcp-server-runtime/request-ha
 import { getProjectService } from "@/main/modules/projects/projects.service";
 import { ToolCatalogService } from "./tool-catalog.service";
 import { transformResourceLinksInResult } from "@/main/utils/uri-utils";
+import { ReconnectingMCPClient } from "@/main/modules/mcp-server-manager/reconnecting-mcp-client";
 
 interface ToolKeyEntry {
   serverId: string;
@@ -73,7 +73,7 @@ export const META_TOOLS: MCPTool[] = [
 
 type ToolCatalogHandlerDeps = {
   servers: Map<string, MCPServer>;
-  clients: Map<string, Client>;
+  clients: Map<string, ReconnectingMCPClient>;
   serverStatusMap: Map<string, boolean>;
   toolCatalogService: ToolCatalogService;
 };
@@ -83,7 +83,7 @@ type ToolCatalogHandlerDeps = {
  */
 export class ToolCatalogHandler extends RequestHandlerBase {
   private servers: Map<string, MCPServer>;
-  private clients: Map<string, Client>;
+  private clients: Map<string, ReconnectingMCPClient>;
   private serverStatusMap: Map<string, boolean>;
   private toolCatalogService: ToolCatalogService;
   private toolKeyMap: Map<string, ToolKeyEntry> = new Map();
@@ -334,7 +334,7 @@ export class ToolCatalogHandler extends RequestHandlerBase {
       serverName,
       "ToolExecute",
       async () => {
-        const result = await client.callTool(
+        const result = await client.getClient().callTool(
           {
             name: toolName,
             arguments: toolArguments,

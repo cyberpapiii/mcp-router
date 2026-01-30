@@ -1,5 +1,4 @@
 import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import {
   MCPServer,
   UNASSIGNED_PROJECT_ID,
@@ -13,6 +12,7 @@ import {
   transformResourceLinksInResult,
 } from "@/main/utils/uri-utils";
 import { MCPServerManager } from "../mcp-server-manager/mcp-server-manager";
+import { ReconnectingMCPClient } from "../mcp-server-manager/reconnecting-mcp-client";
 import { ToolCatalogService } from "@/main/modules/tool-catalog/tool-catalog.service";
 import { TokenValidator } from "./token-validator";
 import { RequestHandlerBase } from "./request-handler-base";
@@ -33,7 +33,7 @@ export class RequestHandlers extends RequestHandlerBase {
   private toolNameToServerMap: Map<string, Map<string, string>> = new Map();
   private serverStatusMap: Map<string, boolean>;
   private servers: Map<string, MCPServer>;
-  private clients: Map<string, Client>;
+  private clients: Map<string, ReconnectingMCPClient>;
   private serverNameToIdMap: Map<string, string>;
   private toolCatalogService: ToolCatalogService;
   private toolCatalogHandler: ToolCatalogHandler;
@@ -224,7 +224,7 @@ export class RequestHandlers extends RequestHandlerBase {
       }
 
       try {
-        const resources = await client.listResources();
+        const resources = await client.getClient().listResources();
 
         if (!resources.resources || resources.resources.length === 0) {
           continue;
@@ -302,7 +302,7 @@ export class RequestHandlers extends RequestHandlerBase {
           }
 
           try {
-            const templates = await client.listResourceTemplates();
+            const templates = await client.getClient().listResourceTemplates();
 
             if (
               !templates.resourceTemplates ||
@@ -413,7 +413,9 @@ export class RequestHandlers extends RequestHandlerBase {
         let lastError: any;
         for (const variantUri of uriVariants) {
           try {
-            const result = await client.readResource({ uri: variantUri.uri });
+            const result = await client
+              .getClient()
+              .readResource({ uri: variantUri.uri });
 
             // No display rules to apply for resources
             // Just return the result as is
@@ -472,7 +474,7 @@ export class RequestHandlers extends RequestHandlerBase {
       }
 
       try {
-        const prompts = await client.listPrompts();
+        const prompts = await client.getClient().listPrompts();
 
         if (!prompts.prompts || prompts.prompts.length === 0) {
           continue;
@@ -567,7 +569,7 @@ export class RequestHandlers extends RequestHandlerBase {
       serverName,
       "GetPrompt",
       async () => {
-        const prompt = await client.getPrompt({
+        const prompt = await client.getClient().getPrompt({
           name: actualPromptName,
           arguments: promptArgs,
         });
@@ -615,7 +617,7 @@ export class RequestHandlers extends RequestHandlerBase {
       }
 
       try {
-        const tools = await client.listTools();
+        const tools = await client.getClient().listTools();
 
         if (!tools.tools || tools.tools.length === 0) {
           continue;
@@ -753,7 +755,7 @@ export class RequestHandlers extends RequestHandlerBase {
       serverName,
       "CallTool",
       async () => {
-        const result = await client.callTool(
+        const result = await client.getClient().callTool(
           {
             name: originalToolName,
             arguments: request.params.arguments || {},

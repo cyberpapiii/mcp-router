@@ -23,6 +23,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "knip": "cd ../.. && knip --workspace apps/electron",
     "postinstall": "electron-rebuild",
     "rebuild": "electron-rebuild",
@@ -119,6 +120,7 @@
     "ts-loader": "^9.5.4",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3",
+    "vitest": "^4.0.18",
     "webpack": "^5.103.0"
   }
 }

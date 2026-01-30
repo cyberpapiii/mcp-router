@@ -216,6 +216,7 @@ export class BM25SearchProvider implements SearchProvider {
     const results: SearchResult[] = scoredResults
       .slice(0, maxResults)
       .map(({ tool, score }) => ({
+        toolKey: tool.toolKey,
         toolName: tool.toolName,
         serverId: tool.serverId,
         serverName: tool.serverName,

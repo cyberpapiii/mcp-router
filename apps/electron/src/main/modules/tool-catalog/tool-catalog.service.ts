@@ -4,6 +4,7 @@ import type {
   SearchResult,
   MCPServer,
   ToolInfo,
+  DetailLevel,
 } from "@mcp_router/shared";
 import type { MCPServerManager } from "@/main/modules/mcp-server-manager/mcp-server-manager";
 import { BM25SearchProvider } from "./bm25-search-provider";
@@ -16,6 +17,7 @@ export type SearchProviderRequest = {
   context?: string;
   tools: ToolInfo[];
   maxResults?: number;
+  detailLevel?: DetailLevel;
 };
 
 /**

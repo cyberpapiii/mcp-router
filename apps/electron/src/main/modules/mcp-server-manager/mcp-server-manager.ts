@@ -30,6 +30,7 @@ export class MCPServerManager {
   private serverService!: ServerService;
   private eventEmitter = new EventEmitter();
   private devWatcher: DevWatcherService;
+  private cachedShellEnv: Record<string, string> = {};
 
   constructor() {
     this.serversDir = path.join(app.getPath("userData"), "mcp-servers");
@@ -52,6 +53,24 @@ export class MCPServerManager {
   public async initializeAsync(): Promise<void> {
     try {
       console.log("[MCPServerManager] Initializing...");
+
+      // Cache shell environment for later use (must be done before starting servers)
+      console.log("[MCPServerManager] Capturing shell environment...");
+      const shellEnv = await getUserShellEnv();
+      // Filter out undefined values and store as Record<string, string>
+      this.cachedShellEnv = Object.entries(shellEnv).reduce(
+        (acc, [key, value]) => {
+          if (value !== undefined) {
+            acc[key] = value;
+          }
+          return acc;
+        },
+        {} as Record<string, string>,
+      );
+      console.log(
+        "[MCPServerManager] Shell environment captured, PATH:",
+        this.cachedShellEnv.PATH?.substring(0, 200) + "...",
+      );
 
       // Initialize server service
       this.serverService = getServerService();
@@ -606,19 +625,12 @@ export class MCPServerManager {
 
   /**
    * Get merged environment variables for a server
+   * Uses cached shell environment captured during initialization
    */
   private getMergedEnv(server: MCPServer): Record<string, string> {
-    const userEnvs = getUserShellEnv();
-    const cleanUserEnvs = Object.entries(userEnvs).reduce(
-      (acc, [key, value]) => {
-        if (value !== undefined) {
-          acc[key] = value as string;
-        }
-        return acc;
-      },
-      {} as Record<string, string>,
-    );
-    return { ...cleanUserEnvs, ...server.env };
+    // Use cached shell environment (already cleaned during initializeAsync)
+    // Server-specific env variables override the shell environment
+    return { ...this.cachedShellEnv, ...server.env };
   }
 
   /**

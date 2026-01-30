@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import type { MCPServerManager } from "../../mcp-server-manager/mcp-server-manager";
+import { getMarketplaceService } from "../../marketplace/marketplace.service";
 
 export function createApiRouter(serverManager: MCPServerManager): Router {
   const router = Router();
@@ -62,6 +63,45 @@ export function createApiRouter(serverManager: MCPServerManager): Router {
     } catch (error) {
       res.status(500).json({
         error: error instanceof Error ? error.message : "Failed to list tools",
+      });
+    }
+  });
+
+  // GET /api/marketplace - Search marketplace
+  router.get("/marketplace", async (req: Request, res: Response) => {
+    try {
+      const service = getMarketplaceService();
+      const options = {
+        search: req.query.search as string,
+        limit: req.query.limit ? parseInt(req.query.limit as string) : undefined,
+        cursor: req.query.cursor as string,
+      };
+      const result = await service.searchServers(options);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({
+        error:
+          error instanceof Error ? error.message : "Marketplace search failed",
+      });
+    }
+  });
+
+  // GET /api/marketplace/:serverName - Get server details
+  router.get("/marketplace/:serverName", async (req: Request, res: Response) => {
+    try {
+      const service = getMarketplaceService();
+      const details = await service.getServerDetails(req.params.serverName);
+      if (!details) {
+        res.status(404).json({ error: "Server not found" });
+        return;
+      }
+      res.json(details);
+    } catch (error) {
+      res.status(500).json({
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to get server details",
       });
     }
   });

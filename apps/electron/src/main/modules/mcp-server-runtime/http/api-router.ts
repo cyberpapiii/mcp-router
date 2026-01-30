@@ -73,7 +73,9 @@ export function createApiRouter(serverManager: MCPServerManager): Router {
       const service = getMarketplaceService();
       const options = {
         search: req.query.search as string,
-        limit: req.query.limit ? parseInt(req.query.limit as string) : undefined,
+        limit: req.query.limit
+          ? parseInt(req.query.limit as string)
+          : undefined,
         cursor: req.query.cursor as string,
       };
       const result = await service.searchServers(options);
@@ -87,24 +89,27 @@ export function createApiRouter(serverManager: MCPServerManager): Router {
   });
 
   // GET /api/marketplace/:serverName - Get server details
-  router.get("/marketplace/:serverName", async (req: Request, res: Response) => {
-    try {
-      const service = getMarketplaceService();
-      const details = await service.getServerDetails(req.params.serverName);
-      if (!details) {
-        res.status(404).json({ error: "Server not found" });
-        return;
+  router.get(
+    "/marketplace/:serverName",
+    async (req: Request, res: Response) => {
+      try {
+        const service = getMarketplaceService();
+        const details = await service.getServerDetails(req.params.serverName);
+        if (!details) {
+          res.status(404).json({ error: "Server not found" });
+          return;
+        }
+        res.json(details);
+      } catch (error) {
+        res.status(500).json({
+          error:
+            error instanceof Error
+              ? error.message
+              : "Failed to get server details",
+        });
       }
-      res.json(details);
-    } catch (error) {
-      res.status(500).json({
-        error:
-          error instanceof Error
-            ? error.message
-            : "Failed to get server details",
-      });
-    }
-  });
+    },
+  );
 
   return router;
 }

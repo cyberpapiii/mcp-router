@@ -1,32 +1,19 @@
 import type {
   SearchRequest,
   SearchResponse,
-  SearchResult,
   MCPServer,
   ToolInfo,
-  DetailLevel,
+  SearchProvider,
+  SearchProviderRequest,
 } from "@mcp_router/shared";
 import type { MCPServerManager } from "@/main/modules/mcp-server-manager/mcp-server-manager";
 import { MiniSearchProvider } from "./minisearch-provider";
 
-/**
- * Search request parameters for search providers.
- */
-export type SearchProviderRequest = {
-  query: string[];
-  context?: string;
-  tools: ToolInfo[];
-  maxResults?: number;
-  detailLevel?: DetailLevel;
-};
+// Re-export for consumers
+export type { SearchProvider, SearchProviderRequest };
 
-/**
- * Interface for search providers.
- */
-export interface SearchProvider {
-  search(request: SearchProviderRequest): Promise<SearchResult[]>;
-}
-
+// Internal type for search context filtering
+// eslint-disable-next-line custom/no-scattered-types
 type SearchContext = {
   projectId: string | null;
   allowedServerIds?: Set<string>;

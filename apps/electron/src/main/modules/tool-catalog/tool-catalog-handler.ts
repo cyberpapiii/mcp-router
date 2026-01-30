@@ -20,6 +20,8 @@ import { ToolCatalogService } from "./tool-catalog.service";
 import { transformResourceLinksInResult } from "@/main/utils/uri-utils";
 import { ReconnectingMCPClient } from "@/main/modules/mcp-server-manager/reconnecting-mcp-client";
 
+// Internal implementation type for tool key tracking
+// eslint-disable-next-line custom/no-scattered-types
 interface ToolKeyEntry {
   serverId: string;
   toolName: string;
@@ -155,6 +157,8 @@ WORKFLOW:
   },
 ];
 
+// Internal dependency injection type for handler initialization
+// eslint-disable-next-line custom/no-scattered-types
 type ToolCatalogHandlerDeps = {
   servers: Map<string, MCPServer>;
   clients: Map<string, ReconnectingMCPClient>;
@@ -672,10 +676,17 @@ export class ToolCatalogHandler extends RequestHandlerBase {
 
         // Parallelize listTools() calls with Promise.allSettled()
         const toolResponses = await Promise.allSettled(
-          serversToQuery.map(async ({ serverId, server, serverName, client }) => {
-            const toolResponse = await client.getClient().listTools();
-            return { serverId, server, serverName, tools: toolResponse?.tools ?? [] };
-          })
+          serversToQuery.map(
+            async ({ serverId, server, serverName, client }) => {
+              const toolResponse = await client.getClient().listTools();
+              return {
+                serverId,
+                server,
+                serverName,
+                tools: toolResponse?.tools ?? [],
+              };
+            },
+          ),
         );
 
         // Process results

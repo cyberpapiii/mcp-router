@@ -108,3 +108,21 @@ export interface ToolCapabilitiesResponse {
   categories: CategoryInfo[];
   servers: ServerInfo[];
 }
+
+/**
+ * Search request parameters for search providers.
+ */
+export type SearchProviderRequest = {
+  query: string[];
+  context?: string;
+  tools: ToolInfo[];
+  maxResults?: number;
+  detailLevel?: DetailLevel;
+};
+
+/**
+ * Interface for search providers.
+ */
+export interface SearchProvider {
+  search(request: SearchProviderRequest): Promise<SearchResult[]>;
+}

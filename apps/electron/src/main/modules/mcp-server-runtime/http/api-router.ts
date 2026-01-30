@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import type { MCPServerManager } from "../../mcp-server-manager/mcp-server-manager";
 import { getMarketplaceService } from "../../marketplace/marketplace.service";
+import { getEventBridge } from "../event-bridge";
 
 export function createApiRouter(serverManager: MCPServerManager): Router {
   const router = Router();
@@ -65,6 +66,48 @@ export function createApiRouter(serverManager: MCPServerManager): Router {
         error: error instanceof Error ? error.message : "Failed to list tools",
       });
     }
+  });
+
+  // GET /api/events - SSE event stream
+  router.get("/events", (req: Request, res: Response) => {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+
+    const eventBridge = getEventBridge();
+
+    const sendEvent = (event: {
+      type: string;
+      data: Record<string, unknown>;
+      timestamp: string;
+    }) => {
+      res.write(`event: ${event.type}\n`);
+      res.write(`data: ${JSON.stringify(event)}\n\n`);
+    };
+
+    // Send initial connection event
+    sendEvent({
+      type: "connected",
+      data: { message: "SSE connection established" },
+      timestamp: new Date().toISOString(),
+    });
+
+    // Subscribe to events
+    const unsubscribe = eventBridge.subscribe(sendEvent);
+
+    // Start heartbeat if this is first subscriber
+    if (eventBridge.getSubscriberCount() === 1) {
+      eventBridge.startHeartbeat(30000);
+    }
+
+    // Cleanup on disconnect
+    req.on("close", () => {
+      unsubscribe();
+      if (eventBridge.getSubscriberCount() === 0) {
+        eventBridge.stopHeartbeat();
+      }
+    });
   });
 
   // GET /api/marketplace - Search marketplace

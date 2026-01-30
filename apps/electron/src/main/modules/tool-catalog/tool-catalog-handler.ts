@@ -24,10 +24,33 @@ const TOOL_KEY_TTL_MS = 60 * 60 * 1000; // 1 hour
 export const META_TOOLS: MCPTool[] = [
   {
     name: "tool_discovery",
-    description:
-      "Discover available tools across MCP servers. " +
-      "Call this freely whenever you're unsure what tools exist or want to explore capabilities for your task. " +
-      "It's lightweight and helps you understand your options before taking action.",
+    description: `REQUIRED FIRST STEP: Search for available tools before execution.
+
+You have access to 200+ tools across multiple servers, but they are NOT listed directly to save context space.
+
+WORKFLOW (you MUST follow this):
+1. Call tool_discovery with keywords describing what you need
+2. Review the returned tools and their toolKeys
+3. Use tool_execute with the exact toolKey to run a tool
+
+AVAILABLE SERVERS: Slack, GitHub, Notion, Google Workspace, filesystem, git, and more.
+
+EXAMPLE QUERIES:
+- ["send", "slack", "message"] → Slack messaging tools
+- ["github", "pull", "request"] → GitHub PR tools
+- ["read", "file"] → File reading tools
+- ["calendar", "events"] → Calendar tools
+
+PARAMETERS:
+- query (required): Keywords array describing functionality needed
+- detailLevel (optional): "minimal" | "summary" | "full" (default: summary)
+- maxResults (optional): Max results to return (default: 10, max: 100)
+- category (optional): Filter by category from tool_capabilities
+- context (optional): Your current task context to improve relevance
+
+ERROR RECOVERY:
+- If toolKey expires, call tool_discovery again with the same query
+- Use tool_capabilities first if unsure what categories exist`,
     inputSchema: {
       type: "object",
       properties: {
@@ -36,13 +59,24 @@ export const META_TOOLS: MCPTool[] = [
           items: { type: "string" },
           description: "Keywords describing the functionality you need.",
         },
-        context: {
+        detailLevel: {
           type: "string",
-          description: "Your current task context to improve relevance.",
+          enum: ["minimal", "summary", "full"],
+          description:
+            "Response detail level. minimal=~5 tokens/tool, summary=~20, full=~100+",
         },
         maxResults: {
           type: "number",
-          description: "Maximum number of results to return.",
+          description: "Maximum results (default: 10, max: 100).",
+        },
+        category: {
+          type: "string",
+          description:
+            "Filter by category (use tool_capabilities to see categories).",
+        },
+        context: {
+          type: "string",
+          description: "Your current task context to improve relevance.",
         },
       },
       required: ["query"],
@@ -50,16 +84,26 @@ export const META_TOOLS: MCPTool[] = [
   },
   {
     name: "tool_execute",
-    description:
-      "Execute a discovered tool on an MCP server. " +
-      "Use this after tool_discovery or when you know the exact toolKey.",
+    description: `Execute a discovered tool using its toolKey.
+
+PREREQUISITE: You must first call tool_discovery to obtain a valid toolKey.
+
+PARAMETERS:
+- toolKey (required): Exact key from tool_discovery results (UUID format)
+- arguments (required): Tool-specific parameters as JSON object
+
+ERROR RECOVERY:
+- "toolKey has expired" → Call tool_discovery again with same query, use new toolKey
+- "toolKey not found" → Verify toolKey matches exactly from discovery results
+- "permission denied" → Tool requires elevated access, check tool_capabilities
+
+IMPORTANT: toolKeys expire after 60 minutes. If you cached a toolKey and get an expiration error, simply re-run tool_discovery.`,
     inputSchema: {
       type: "object",
       properties: {
         toolKey: {
           type: "string",
-          description:
-            "Tool identifier (serverId:toolName) from tool_search results.",
+          description: "Tool identifier (UUID) from tool_discovery results.",
         },
         arguments: {
           type: "object",
@@ -67,6 +111,37 @@ export const META_TOOLS: MCPTool[] = [
         },
       },
       required: ["toolKey"],
+    },
+  },
+  {
+    name: "tool_capabilities",
+    description: `Browse available tool categories and servers WITHOUT consuming context.
+
+Use this for high-level exploration BEFORE detailed search:
+- "What kinds of tools are available?"
+- "What can the GitHub server do?"
+- "Show me messaging capabilities"
+
+Returns categories with tool counts and example operations.
+Does NOT return executable toolKeys—use tool_discovery for that.
+
+WORKFLOW:
+1. Call tool_capabilities to see what's available
+2. Call tool_discovery with specific category or keywords
+3. Call tool_execute with discovered toolKey`,
+    inputSchema: {
+      type: "object",
+      properties: {
+        server: {
+          type: "string",
+          description: "Filter to a specific server (e.g., 'github', 'slack').",
+        },
+        category: {
+          type: "string",
+          description: "Filter to a specific category.",
+        },
+      },
+      required: [],
     },
   },
 ];

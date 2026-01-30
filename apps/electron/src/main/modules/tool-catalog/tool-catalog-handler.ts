@@ -6,6 +6,7 @@ import {
   MCPTool,
   UNASSIGNED_PROJECT_ID,
 } from "@mcp_router/shared";
+import type { DetailLevel, ExpirationMetadata } from "@mcp_router/shared";
 import { TokenValidator } from "@/main/modules/mcp-server-runtime/token-validator";
 import { RequestHandlerBase } from "@/main/modules/mcp-server-runtime/request-handler-base";
 import { getProjectService } from "@/main/modules/projects/projects.service";
@@ -19,7 +20,9 @@ interface ToolKeyEntry {
   createdAt: number;
 }
 
-const TOOL_KEY_TTL_MS = 60 * 60 * 1000; // 1 hour
+// Configurable TTL (can be overridden via config in future)
+const TOOL_KEY_TTL_MINUTES = 60;
+const TOOL_KEY_TTL_MS = TOOL_KEY_TTL_MINUTES * 60 * 1000;
 
 export const META_TOOLS: MCPTool[] = [
   {
@@ -264,6 +267,16 @@ export class ToolCatalogHandler extends RequestHandlerBase {
     }
   }
 
+  private buildExpirationMetadata(): ExpirationMetadata {
+    const now = Date.now();
+    const expiresAt = new Date(now + TOOL_KEY_TTL_MS);
+    return {
+      expiresAt: expiresAt.toISOString(),
+      expiresInSeconds: TOOL_KEY_TTL_MINUTES * 60,
+      ttlMinutes: TOOL_KEY_TTL_MINUTES,
+    };
+  }
+
   private getProjectOptimization(projectId: string | null) {
     if (!projectId) {
       return undefined;
@@ -287,15 +300,22 @@ export class ToolCatalogHandler extends RequestHandlerBase {
     if (query.length === 0) {
       throw new McpError(ErrorCode.InvalidRequest, "Query is required");
     }
+
     const context = typeof args.context === "string" ? args.context : undefined;
     const maxResults =
-      typeof args.maxResults === "number" ? args.maxResults : undefined;
+      typeof args.maxResults === "number" ? args.maxResults : 10;
+    const detailLevel: DetailLevel =
+      args.detailLevel === "minimal" || args.detailLevel === "full"
+        ? args.detailLevel
+        : "summary";
+    const category =
+      typeof args.category === "string" ? args.category : undefined;
 
     const optimization = this.getProjectOptimization(projectId);
 
     return await this.executeWithHooksAndLogging(
       "tools/discovery",
-      { query, context, maxResults },
+      { query, context, maxResults, detailLevel, category },
       clientId,
       AGGREGATOR_SERVER_NAME,
       "ToolDiscovery",
@@ -308,7 +328,7 @@ export class ToolCatalogHandler extends RequestHandlerBase {
         }
 
         const response = await this.toolCatalogService.searchTools(
-          { query, context, maxResults },
+          { query, context, maxResults, detailLevel, category },
           {
             projectId,
             allowedServerIds,
@@ -316,22 +336,60 @@ export class ToolCatalogHandler extends RequestHandlerBase {
           },
         );
 
-        const results = response.results.map((result) => ({
-          toolKey: this.buildToolKey(result.serverId, result.toolName),
-          toolName: result.toolName,
-          serverName: result.serverName,
-          description: result.description,
-          relevance: result.relevance,
-          explanation: result.explanation,
-          outputSchema: result.outputSchema,
-          annotations: result.annotations,
-        }));
+        // Format results based on detail level
+        const results = response.results.map((result) => {
+          const toolKey = this.buildToolKey(result.serverId, result.toolName);
+
+          // Minimal: just identification
+          const minimal = {
+            toolKey,
+            toolName: result.toolName,
+            serverName: result.serverName,
+          };
+
+          if (detailLevel === "minimal") {
+            return minimal;
+          }
+
+          // Summary: add description and relevance
+          const summary = {
+            ...minimal,
+            description: result.description?.substring(0, 150),
+            relevance: result.relevance,
+          };
+
+          if (detailLevel === "summary") {
+            return summary;
+          }
+
+          // Full: everything
+          return {
+            ...summary,
+            description: result.description,
+            serverId: result.serverId,
+            explanation: result.explanation,
+            outputSchema: result.outputSchema,
+            annotations: result.annotations,
+          };
+        });
+
+        // Build response with metadata
+        const expiration = this.buildExpirationMetadata();
+        const responsePayload = {
+          tools: results,
+          metadata: {
+            query,
+            detailLevel,
+            resultCount: results.length,
+            expiration,
+          },
+        };
 
         return {
           content: [
             {
               type: "text",
-              text: JSON.stringify(results, null, 2),
+              text: JSON.stringify(responsePayload, null, 2),
             },
           ],
         };

@@ -23,26 +23,58 @@ export interface ToolInfo {
   };
 }
 
+/**
+ * Detail level for tool discovery responses.
+ * - minimal: toolKey, toolName, serverName only (~5 tokens/tool)
+ * - summary: + truncated description (~20 tokens/tool)
+ * - full: + inputSchema, outputSchema, annotations (~100+ tokens/tool)
+ */
+export type DetailLevel = 'minimal' | 'summary' | 'full';
+
+/**
+ * Expiration metadata for tool discovery responses.
+ */
+export interface ExpirationMetadata {
+  expiresAt: string; // ISO timestamp
+  expiresInSeconds: number;
+  ttlMinutes: number;
+}
+
 export interface SearchRequest {
   query: string[];
   context?: string;
   maxResults?: number;
+  detailLevel?: DetailLevel;
+  category?: string; // Filter by category
 }
 
 export interface SearchResult {
-  toolName: string;
+  toolKey: string; // Always included
+  toolName: string; // Always included
+  serverName: string; // Always included
   serverId: string;
-  serverName: string;
   projectId: string | null;
+  // summary+ level
   description?: string;
-  relevance: number; // 0-1 normalized score
-  explanation?: string; // Optional explanation (e.g., selection reason)
-  /** Output schema for structured results */
+  relevance?: number; // 0-1 normalized score
+  // full level only
+  explanation?: string;
+  inputSchema?: ToolInfo['inputSchema'];
   outputSchema?: any;
-  /** Behavioral hints from upstream server */
-  annotations?: ToolInfo["annotations"];
+  annotations?: ToolInfo['annotations'];
 }
 
 export interface SearchResponse {
   results: SearchResult[];
+}
+
+export interface SearchResponseMetadata {
+  query: string[];
+  detailLevel: DetailLevel;
+  resultCount: number;
+  expiration: ExpirationMetadata;
+}
+
+export interface SearchResponseWithMetadata extends SearchResponse {
+  metadata: SearchResponseMetadata;
 }

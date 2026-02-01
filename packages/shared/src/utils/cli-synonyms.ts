@@ -41,7 +41,17 @@ export const CLI_SYNONYMS: Record<string, string[]> = {
   open: ["launch", "start", "load", "access"],
   close: ["quit", "exit", "end", "shutdown"],
   edit: ["modify", "change", "update", "alter"],
-  check: ["verify", "validate", "test", "inspect"],
+  check: [
+    "verify",
+    "validate",
+    "test",
+    "inspect",
+    "read",
+    "get",
+    "list",
+    "view",
+    "show",
+  ],
 
   // Messaging/communication
   send: ["post", "message", "notify", "transmit"],
@@ -50,6 +60,11 @@ export const CLI_SYNONYMS: Record<string, string[]> = {
   // Calendar/scheduling
   schedule: ["book", "plan", "calendar", "event"],
   meeting: ["event", "appointment", "call"],
+
+  // Natural language mappings for common user intents
+  inbox: ["email", "gmail", "mail", "messages"],
+  texts: ["imessage", "sms", "messages", "text"],
+  dm: ["message", "direct", "chat", "private"],
 };
 
 /**

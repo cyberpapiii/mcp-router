@@ -90,7 +90,7 @@ type ProjectOptimization = ToolCatalogSearchStrategy | null;
 - `POST /catalog/search`
   ```ts
   type ToolInfo = {
-    toolKey: string; // `${serverId}:${toolName}`
+    toolKey: string; // `${serverName}:${toolName}` (semantic, case-insensitive)
     toolName: string;
     serverName: string;
     description?: string;
@@ -153,7 +153,7 @@ type ProjectOptimization = ToolCatalogSearchStrategy | null;
 - Input (CallTool `arguments`):
   ```ts
   {
-    toolKey: string; // `${serverId}:${toolName}` etc.
+    toolKey: string; // `${serverName}:${toolName}` (semantic, case-insensitive)
     arguments?: unknown;
   }
   ```

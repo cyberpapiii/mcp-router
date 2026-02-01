@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
 import {
   AGGREGATOR_SERVER_NAME,
@@ -8,7 +7,6 @@ import {
 } from "@mcp_router/shared";
 import type {
   DetailLevel,
-  ExpirationMetadata,
   ServerInfo,
   CategoryInfo,
   ToolCapabilitiesResponse,
@@ -20,31 +18,19 @@ import { ToolCatalogService } from "./tool-catalog.service";
 import { transformResourceLinksInResult } from "@/main/utils/uri-utils";
 import { ReconnectingMCPClient } from "@/main/modules/mcp-server-manager/reconnecting-mcp-client";
 
-// Internal implementation type for tool key tracking
-// eslint-disable-next-line custom/no-scattered-types
-interface ToolKeyEntry {
-  serverId: string;
-  toolName: string;
-  createdAt: number;
-}
-
-// Configurable TTL (can be overridden via config in future)
-const TOOL_KEY_TTL_MINUTES = 60;
-const TOOL_KEY_TTL_MS = TOOL_KEY_TTL_MINUTES * 60 * 1000;
-
 export const META_TOOLS: MCPTool[] = [
   {
     name: "tool_discovery",
-    description: `REQUIRED FIRST STEP: Search for available tools before execution.
+    description: `Search for available tools across all connected servers.
 
 You have access to 200+ tools across multiple servers, but they are NOT listed directly to save context space.
 
-WORKFLOW (you MUST follow this):
-1. Call tool_discovery with keywords describing what you need
-2. Review the returned tools and their toolKeys
-3. Use tool_execute with the exact toolKey to run a tool
+WHEN TO USE:
+- When you don't know which tool to use
+- When searching for tools by keyword or capability
+- When exploring what's available
 
-AVAILABLE SERVERS: Slack, GitHub, Notion, Google Workspace, filesystem, git, and more.
+DIRECT ACCESS: If you already know the server and tool name, skip discovery and use tool_execute directly with 'serverName:toolName'.
 
 EXAMPLE QUERIES:
 - ["send", "slack", "message"] → Slack messaging tools
@@ -57,11 +43,7 @@ PARAMETERS:
 - detailLevel (optional): "minimal" | "summary" | "full" (default: summary)
 - maxResults (optional): Max results to return (default: 10, max: 100)
 - category (optional): Filter by category from tool_capabilities
-- context (optional): Your current task context to improve relevance
-
-ERROR RECOVERY:
-- If toolKey expires, call tool_discovery again with the same query
-- Use tool_capabilities first if unsure what categories exist`,
+- context (optional): Your current task context to improve relevance`,
     inputSchema: {
       type: "object",
       properties: {
@@ -95,26 +77,34 @@ ERROR RECOVERY:
   },
   {
     name: "tool_execute",
-    description: `Execute a discovered tool using its toolKey.
+    description: `Execute a tool using its toolKey.
 
-PREREQUISITE: You must first call tool_discovery to obtain a valid toolKey.
+TOOLKEY FORMAT: 'serverName:toolName' (e.g., 'slack:channels_list', 'imessage:send')
+
+DIRECT ACCESS: If you know the server and tool name, use the toolKey directly without discovery.
+DISCOVERY: If unsure which tool to use, call tool_discovery first to search.
 
 PARAMETERS:
-- toolKey (required): Exact key from tool_discovery results (UUID format)
+- toolKey (required): Format is 'serverName:toolName' (e.g., 'notion:search', 'gmail:search_gmail_messages')
+  - Server names are case-insensitive ('Slack:send' and 'slack:send' both work)
 - arguments (required): Tool-specific parameters as JSON object
 
 ERROR RECOVERY:
-- "toolKey has expired" → Call tool_discovery again with same query, use new toolKey
-- "toolKey not found" → Verify toolKey matches exactly from discovery results
-- "permission denied" → Tool requires elevated access, check tool_capabilities
+- "Server not found" → Use tool_capabilities to see available servers
+- "Tool not found" → Use tool_discovery to search for the tool
 
-IMPORTANT: toolKeys expire after 60 minutes. If you cached a toolKey and get an expiration error, simply re-run tool_discovery.`,
+FORMATS:
+- 'serverName:toolName' (friendly): slack:channels_list, imessage:send
+- 'serverId:toolName' (stable): Use if server name is ambiguous or for long-lived automation
+
+TIP: Semantic toolKeys never expire. Once you know 'slack:channels_list', you can use it forever.`,
     inputSchema: {
       type: "object",
       properties: {
         toolKey: {
           type: "string",
-          description: "Tool identifier (UUID) from tool_discovery results.",
+          description:
+            "Tool identifier in 'serverName:toolName' format (e.g., 'slack:channels_list').",
         },
         arguments: {
           type: "object",
@@ -128,7 +118,7 @@ IMPORTANT: toolKeys expire after 60 minutes. If you cached a toolKey and get an 
     name: "tool_capabilities",
     description: `Browse available tool categories and servers WITHOUT consuming context.
 
-Use this for high-level exploration BEFORE detailed search:
+Use this for high-level exploration:
 - "What kinds of tools are available?"
 - "What can the GitHub server do?"
 - "Show me messaging capabilities"
@@ -137,9 +127,8 @@ Returns categories with tool counts and example operations.
 Does NOT return executable toolKeys—use tool_discovery for that.
 
 WORKFLOW:
-1. Call tool_capabilities to see what's available
-2. Call tool_discovery with specific category or keywords
-3. Call tool_execute with discovered toolKey`,
+- DIRECT: If you know the tool → tool_execute('serverName:toolName')
+- EXPLORE: tool_capabilities → tool_discovery → tool_execute`,
     inputSchema: {
       type: "object",
       properties: {
@@ -174,7 +163,7 @@ export class ToolCatalogHandler extends RequestHandlerBase {
   private clients: Map<string, ReconnectingMCPClient>;
   private serverStatusMap: Map<string, boolean>;
   private toolCatalogService: ToolCatalogService;
-  private toolKeyMap: Map<string, ToolKeyEntry> = new Map();
+  private lowerCaseNameToIdMap: Map<string, string> = new Map();
 
   constructor(tokenValidator: TokenValidator, deps: ToolCatalogHandlerDeps) {
     super(tokenValidator);
@@ -182,6 +171,34 @@ export class ToolCatalogHandler extends RequestHandlerBase {
     this.clients = deps.clients;
     this.serverStatusMap = deps.serverStatusMap;
     this.toolCatalogService = deps.toolCatalogService;
+    this.rebuildNameLookup(); // Build initial name lookup
+  }
+
+  /**
+   * Rebuild the case-insensitive server name lookup map.
+   * Called on construction and when servers change.
+   */
+  private rebuildNameLookup(): void {
+    this.lowerCaseNameToIdMap.clear();
+    for (const [id, server] of this.servers) {
+      const lowerName = server.name.toLowerCase();
+      if (this.lowerCaseNameToIdMap.has(lowerName)) {
+        console.warn(
+          `[ToolCatalog] Server name collision: "${server.name}" - use serverId:toolName for disambiguation`,
+        );
+      }
+      // First one wins (deterministic)
+      if (!this.lowerCaseNameToIdMap.has(lowerName)) {
+        this.lowerCaseNameToIdMap.set(lowerName, id);
+      }
+    }
+  }
+
+  /**
+   * Case-insensitive O(1) server name lookup.
+   */
+  private getServerIdByName(name: string): string | undefined {
+    return this.lowerCaseNameToIdMap.get(name.toLowerCase());
   }
 
   private normalizeProjectId(projectId: unknown): string | null {
@@ -222,89 +239,77 @@ export class ToolCatalogHandler extends RequestHandlerBase {
     serverId: string;
     toolName: string;
   } {
-    // First, try to resolve from the temporary toolKey map
-    const entry = this.toolKeyMap.get(toolKey);
-    if (entry) {
-      // Check TTL
-      if (Date.now() - entry.createdAt > TOOL_KEY_TTL_MS) {
-        this.toolKeyMap.delete(toolKey);
-        throw this.createActionableError(
-          ErrorCode.InvalidRequest,
-          "TOOLKEY_EXPIRED",
-          `toolKey has expired: ${toolKey}`,
-          {
-            action: "Rediscover the tool",
-            steps: [
-              "Call tool_discovery with your original search query",
-              "Use the new toolKey from the response",
-              "Retry tool_execute with the fresh toolKey",
-            ],
-            hint: `toolKeys expire after ${TOOL_KEY_TTL_MINUTES} minutes to ensure you have current tool definitions`,
-          },
-        );
-      }
-      return {
-        serverId: entry.serverId,
-        toolName: entry.toolName,
-      };
-    }
-
-    // Fallback: parse as legacy format (serverId:toolName)
-    const separatorIndex = toolKey.indexOf(":");
-    if (separatorIndex <= 0 || separatorIndex >= toolKey.length - 1) {
+    // Split on FIRST colon only (tool names may contain colons)
+    const colonIndex = toolKey.indexOf(":");
+    if (colonIndex <= 0) {
       throw this.createActionableError(
         ErrorCode.InvalidRequest,
         "TOOLKEY_INVALID",
         `Invalid toolKey format: ${toolKey}`,
         {
-          action: "Verify the toolKey",
+          action: "Use format 'serverName:toolName'",
           steps: [
-            "Ensure the toolKey matches exactly from tool_discovery results",
-            "toolKeys are UUIDs (e.g., '550e8400-e29b-41d4-a716-446655440000')",
-            "If unsure, call tool_discovery again to get a fresh toolKey",
+            "Use format 'serverName:toolName' (e.g., 'slack:channels_list')",
+            "Use tool_capabilities to verify server names",
+            "Use tool_discovery to search for tools",
+          ],
+          suggestedTools: ["tool_capabilities", "tool_discovery"],
+        },
+      );
+    }
+
+    const name = toolKey.slice(0, colonIndex);
+    const toolName = toolKey.slice(colonIndex + 1); // Everything after first colon
+
+    if (!toolName) {
+      throw this.createActionableError(
+        ErrorCode.InvalidRequest,
+        "TOOLKEY_INVALID",
+        `Invalid toolKey format: ${toolKey} (missing tool name)`,
+        {
+          action: "Provide a tool name after the colon",
+          steps: [
+            "Use format 'serverName:toolName' (e.g., 'slack:channels_list')",
+            "Use tool_discovery to find available tools",
           ],
           suggestedTools: ["tool_discovery"],
         },
       );
     }
 
-    return {
-      serverId: toolKey.slice(0, separatorIndex),
-      toolName: toolKey.slice(separatorIndex + 1),
-    };
+    // Try as serverId first (direct UUID lookup)
+    if (this.servers.get(name)) {
+      return { serverId: name, toolName };
+    }
+
+    // Try as serverName (case-insensitive lookup)
+    const serverId = this.getServerIdByName(name);
+    if (serverId) {
+      return { serverId, toolName };
+    }
+
+    // Neither worked
+    throw this.createActionableError(
+      ErrorCode.InvalidRequest,
+      "SERVER_NOT_FOUND",
+      `Server '${name}' not found`,
+      {
+        action: "Verify the server name",
+        steps: [
+          "Use tool_capabilities to see available servers",
+          "Server names are case-INSENSITIVE ('Slack' and 'slack' both work)",
+          "Use serverId:toolName for unambiguous access",
+        ],
+        suggestedTools: ["tool_capabilities"],
+      },
+    );
   }
 
   private buildToolKey(serverId: string, toolName: string): string {
-    // Cleanup expired entries periodically
-    this.cleanupExpiredToolKeys();
-
-    // Generate a temporary UUID-based toolKey
-    const toolKey = randomUUID();
-    this.toolKeyMap.set(toolKey, {
-      serverId,
-      toolName,
-      createdAt: Date.now(),
-    });
-    return toolKey;
-  }
-
-  private cleanupExpiredToolKeys(): void {
-    const now = Date.now();
-    for (const [key, entry] of this.toolKeyMap) {
-      if (now - entry.createdAt > TOOL_KEY_TTL_MS) {
-        this.toolKeyMap.delete(key);
-      }
-    }
-  }
-
-  private buildExpirationMetadata(): ExpirationMetadata {
-    const now = Date.now();
-    const expiresAt = new Date(now + TOOL_KEY_TTL_MS);
-    return {
-      expiresAt: expiresAt.toISOString(),
-      expiresInSeconds: TOOL_KEY_TTL_MINUTES * 60,
-      ttlMinutes: TOOL_KEY_TTL_MINUTES,
-    };
+    // Return semantic serverName:toolName format (no UUID, no TTL)
+    const server = this.servers.get(serverId);
+    const serverName = server?.name || serverId;
+    return `${serverName}:${toolName}`;
   }
 
   /**
@@ -392,7 +397,8 @@ export class ToolCatalogHandler extends RequestHandlerBase {
           {
             projectId,
             allowedServerIds,
-            toolCatalogEnabled: !!optimization,
+            // Catalog mode is always enabled - meta-tools are the default interface
+            toolCatalogEnabled: true,
           },
         );
 
@@ -411,11 +417,13 @@ export class ToolCatalogHandler extends RequestHandlerBase {
             return minimal;
           }
 
-          // Summary: add description and relevance
+          // Summary: add description, relevance, and schema for immediate execution
           const summary = {
             ...minimal,
             description: result.description?.substring(0, 150),
             relevance: result.relevance,
+            inputSchema: result.inputSchema, // Include schema so agents can execute immediately
+            serverId: result.serverId, // Include for disambiguation
           };
 
           if (detailLevel === "summary") {
@@ -433,15 +441,14 @@ export class ToolCatalogHandler extends RequestHandlerBase {
           };
         });
 
-        // Build response with metadata
-        const expiration = this.buildExpirationMetadata();
+        // Build response with metadata (no expiration - semantic keys are stable)
         const responsePayload = {
           tools: results,
           metadata: {
             query,
             detailLevel,
             resultCount: results.length,
-            expiration,
+            hint: "Semantic toolKeys (serverName:toolName) never expire. Use them directly in future sessions.",
           },
         };
 
@@ -709,8 +716,9 @@ export class ToolCatalogHandler extends RequestHandlerBase {
               serverToolCount++;
               totalTools++;
 
-              // Infer category from tool name/description
+              // Infer category from server name first, then tool name/description
               const category = this.inferCategory(
+                serverName,
                 tool.name,
                 tool.description || "",
               );
@@ -806,22 +814,58 @@ export class ToolCatalogHandler extends RequestHandlerBase {
   /**
    * Infer category from tool name and description.
    */
-  private inferCategory(toolName: string, description: string): string {
+  private inferCategory(
+    serverName: string,
+    toolName: string,
+    description: string,
+  ): string {
+    const lowerServerName = serverName.toLowerCase();
+
+    // Primary signal: server name (most reliable)
+    const serverCategoryMap: Record<string, string> = {
+      slack: "messaging",
+      discord: "messaging",
+      teams: "messaging",
+      imessage: "messaging",
+      github: "github",
+      gitlab: "github",
+      bitbucket: "github",
+      gmail: "email",
+      outlook: "email",
+      calendar: "calendar",
+      notion: "notes",
+      obsidian: "notes",
+      evernote: "notes",
+      figma: "design",
+      supabase: "database",
+      postgres: "database",
+      mysql: "database",
+      mongodb: "database",
+      filesystem: "file_operations",
+      git: "git",
+    };
+
+    // Check if server name matches or contains a known service
+    for (const [service, category] of Object.entries(serverCategoryMap)) {
+      if (lowerServerName.includes(service)) {
+        return category;
+      }
+    }
+
+    // Secondary signal: tool name and description patterns (more specific patterns)
     const text = `${toolName} ${description}`.toLowerCase();
 
     const categoryPatterns: [string, RegExp][] = [
-      ["file_operations", /file|read|write|directory|folder|path|fs/],
-      ["git", /git|commit|branch|merge|push|pull|clone|diff/],
-      ["github", /github|issue|pull.?request|pr|repo|gist/],
-      ["messaging", /message|chat|slack|send|channel|dm/],
-      ["calendar", /calendar|event|schedule|meeting|appointment/],
-      ["email", /email|mail|inbox|send.*mail/],
-      ["database", /database|db|query|sql|table|record/],
-      ["api", /api|http|request|endpoint|rest|fetch/],
-      ["shell", /shell|bash|terminal|command|exec|run/],
-      ["search", /search|find|query|lookup|filter/],
-      ["auth", /auth|login|token|password|credential/],
-      ["notification", /notification|notify|alert|push/],
+      // More specific patterns to avoid false positives
+      ["github", /\bgithub\b|pull.?request|create_issue|list_repos/],
+      ["git", /\bgit\b|commit|branch|merge|clone|checkout/],
+      ["email", /\bemail\b|\bgmail\b|\binbox\b|send.*mail/],
+      ["calendar", /\bcalendar\b|\bevent\b|schedule|meeting|appointment/],
+      ["messaging", /\bslack\b|\bchannel\b|send.*message|chat|dm\b/],
+      ["database", /\bdatabase\b|\bsql\b|\bquery\b.*table|\brecord\b/],
+      ["file_operations", /\bfile\b|\bdirectory\b|\bfolder\b|\bpath\b/],
+      ["shell", /\bshell\b|\bbash\b|\bterminal\b|\bexec\b/],
+      ["auth", /\bauth\b|\blogin\b|\bpassword\b|\bcredential\b/],
     ];
 
     for (const [category, pattern] of categoryPatterns) {
@@ -841,10 +885,12 @@ export class ToolCatalogHandler extends RequestHandlerBase {
       file_operations: "Read, write, and manipulate files and directories",
       git: "Version control operations (commit, branch, merge)",
       github: "GitHub-specific operations (issues, PRs, repos)",
-      messaging: "Send and receive messages (Slack, chat)",
+      messaging: "Send and receive messages (Slack, iMessage, chat)",
       calendar: "Calendar and scheduling operations",
       email: "Email sending and management",
       database: "Database queries and operations",
+      notes: "Note-taking and documentation (Notion, Obsidian)",
+      design: "Design tools (Figma, sketches)",
       api: "HTTP/REST API interactions",
       shell: "Shell command execution",
       search: "Search and find operations",

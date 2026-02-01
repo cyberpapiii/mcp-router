@@ -161,11 +161,13 @@ export class MiniSearchProvider implements SearchProvider {
       return minimal;
     }
 
-    // Summary: add truncated description and relevance
+    // Summary: add truncated description, relevance, AND full schema
+    // Rationale: 3k tokens is negligible vs latency of extra round-trip
     const summary: SearchResult = {
       ...minimal,
       description: tool.description?.substring(0, 150),
       relevance,
+      inputSchema: tool.inputSchema, // FULL schema for immediate execution
     };
 
     if (detailLevel === "summary") {

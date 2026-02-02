@@ -5,13 +5,14 @@
 - Persist the server-level `toolPermissions` map so disabled tools remain inactive after restart.
 - Filter disabled tools from aggregated listings and prevent invocation at runtime.
 
-## Current State
-- `ServerDetailsAdvancedSheet` presents general settings and input parameters but has no tooling controls.
-- `useServerEditingStore` tracks command, args, env, etc. but lacks tool permission state.
-- Main process exposes `updateServerToolPermissions`, yet the IPC layer never calls it and database rows lack a `tool_permissions` column.
-- Runtime tooling (`request-handlers.ts`) lists and invokes tools without inspecting `toolPermissions`, so global disablement is impossible.
+## Current State (IMPLEMENTED)
+- `ServerDetailsAdvancedSheet` includes a "Tools" tab with enable/disable controls.
+- `useServerEditingStore` tracks `editedToolPermissions` state.
+- IPC handler EXISTS at `mcp-server-manager.ipc.ts` for tool permission updates.
+- Database `tool_permissions` column EXISTS in the servers table.
+- Runtime filtering IS implemented in `request-handlers.ts` to skip disabled tools.
 
-## Proposed Changes
+## Implemented Changes
 ### Renderer UI
 - Add a “Tools” tab to `ServerDetailsAdvancedSheet` that appears when tools are available.
 - Fetch tools on demand through `platformAPI.servers.listTools(server.id)` and show each entry with a `Switch`.

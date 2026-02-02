@@ -15,40 +15,43 @@ Additionally, some tables (hooks) were also created in migration files, causing 
 
 ## Decisions
 
-### 1. Centralized Schema Definition Management
-Manage all table definitions in TypeScript files under the `schema/tables/` directory. Each schema file has the following structure:
+### 1. Inline Schema Definition per Repository
+Each repository class defines its own table schema using inline SQL constants. This approach keeps schema definitions co-located with the repository logic:
 
 ```typescript
-import { DatabaseTableSchema } from "@mcp_router/shared";
+export class ExampleRepository extends BaseRepository<Example> {
+  /**
+   * SQL for table creation
+   */
+  private static readonly CREATE_TABLE_SQL = `
+    CREATE TABLE IF NOT EXISTS examples (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      config TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    )
+  `;
 
-export const TABLE_NAME_SCHEMA: DatabaseTableSchema = {
-  createSQL: `CREATE TABLE IF NOT EXISTS ...`,
-  indexes: [
-    "CREATE INDEX IF NOT EXISTS ...",
-    // Other indexes
-  ]
-};
-
-export const TABLE_NAME_REQUIRED_COLUMNS = ["col1", "col2"];
+  protected initializeTable(): void {
+    this.db.execute(ExampleRepository.CREATE_TABLE_SQL);
+    // Create indexes as needed
+    this.db.execute("CREATE INDEX IF NOT EXISTS idx_examples_name ON examples(name)");
+  }
+}
 ```
 
-### 2. Unified Pattern for Repository Classes
-All repository classes import the corresponding schema definition and use it in the initializeTable() method:
+### 2. Repository-Level Table Initialization
+Each repository is responsible for creating its own table during initialization:
 
 ```typescript
-import { TABLE_SCHEMA } from "../../schema/tables/table-name";
-
 protected initializeTable(): void {
   try {
-    // Create table using schema definition
-    this.db.execute(TABLE_SCHEMA.createSQL);
+    // Create table using inline SQL constant
+    this.db.execute(ExampleRepository.CREATE_TABLE_SQL);
 
-    // Create indexes from schema definition
-    if (TABLE_SCHEMA.indexes) {
-      TABLE_SCHEMA.indexes.forEach((indexSQL) => {
-        this.db.execute(indexSQL);
-      });
-    }
+    // Create indexes
+    this.db.execute("CREATE INDEX IF NOT EXISTS idx_name ON table(column)");
 
     console.log(`[${this.constructor.name}] Table initialization completed`);
   } catch (error) {
@@ -58,52 +61,66 @@ protected initializeTable(): void {
 }
 ```
 
-### 3. Aggregation via DATABASE_SCHEMA Object
-Aggregate all schema definitions in the `database-schema.ts` file:
+### 3. Migration File for Schema Modifications
+The `main-database-migration.ts` file handles ALTER TABLE operations for existing tables. New table creation is handled by repository initialization.
 
-```typescript
-export const DATABASE_SCHEMA = {
-  servers: SERVERS_SCHEMA,
-  requestLogs: REQUEST_LOGS_SCHEMA,
-  settings: SETTINGS_SCHEMA,
-  migrations: MIGRATIONS_SCHEMA,
-  workspaces: WORKSPACES_SCHEMA,
-  hooks: HOOKS_SCHEMA,
-  tokens: TOKENS_SCHEMA,
-} as const;
-```
-
-### 4. Migration Responsibility Scope
-Migrations are responsible only for modifications to existing tables (ALTER TABLE) and do not create new tables. Table creation is executed during repository class initialization.
+### 4. File-Based Storage for Configuration Data
+Some repositories (SettingsRepository, McpAppsManagerRepository) use SharedConfigManager for file-based JSON storage instead of SQLite, keeping configuration data portable and human-readable.
 
 ## Implementation Details
 
 ### Repository Class List and Mapping
 
-| Repository Class | Table Name | Schema File | Inherits BaseRepository |
+| Repository Class | Table Name | Storage Type | Inherits BaseRepository |
 |---|---|---|---|
-| HookRepository | hooks | hooks.ts | Yes |
-| McpLoggerRepository | requestLogs | request-logs.ts | Yes |
-| McpServerManagerRepository | servers | servers.ts | Yes |
-| SettingsRepository | settings | settings.ts | No |
-| McpAppsManagerRepository | tokens | tokens.ts | Yes |
-| WorkspaceRepository | workspaces | workspaces.ts | Yes |
+| McpServerManagerRepository | servers | SQLite | Yes |
+| McpLoggerRepository | requestLogs | SQLite | Yes |
+| WorkspaceRepository | workspaces | SQLite | Yes |
+| HookRepository | hook_modules | SQLite | No |
+| WorkflowRepository | workflows | SQLite | No |
+| SkillRepository | skills | SQLite | Yes |
+| AgentPathRepository | agent_paths | SQLite | Yes |
+| ProjectRepository | projects | SQLite | Yes |
+| SettingsRepository | N/A | SharedConfigManager (file-based) | No |
+| McpAppsManagerRepository | N/A | SharedConfigManager (file-based) | No |
 
-### Special Handling for SettingsRepository
-SettingsRepository does not inherit from BaseRepository, so it implements its own initializeTable() method. However, it uses the same pattern with schema definitions.
+### File-Based Repositories
+SettingsRepository and McpAppsManagerRepository use SharedConfigManager for file-based JSON storage:
+
+```typescript
+export class SettingsRepository {
+  private static instance: SettingsRepository | null = null;
+
+  public static getInstance(): SettingsRepository {
+    if (!SettingsRepository.instance) {
+      SettingsRepository.instance = new SettingsRepository();
+    }
+    return SettingsRepository.instance;
+  }
+
+  public getSettings(): AppSettings {
+    return getSharedConfigManager().getSettings();
+  }
+}
+```
+
+This approach provides:
+- Portable configuration files
+- Human-readable JSON format
+- Easy backup and migration
 
 ## Consequences
 
 ### Advantages
-1. **DRY principle achieved**: Complete elimination of duplicate table definitions
-2. **Improved maintainability**: Table structure changes managed in one location
-3. **Type safety**: Type checking via DatabaseTableSchema type
-4. **Consistency**: All tables managed with the same pattern
-5. **Readability**: Clear roles and easy-to-understand structure
+1. **Co-location**: Schema definitions are co-located with repository logic
+2. **Self-contained repositories**: Each repository manages its own table lifecycle
+3. **Flexibility**: Repositories can use SQLite or file-based storage as appropriate
+4. **Consistency**: All SQLite-based repositories follow the same initialization pattern
+5. **Readability**: Easy to understand table structure by reading the repository
 
 ### Disadvantages
-1. **Initial implementation cost**: Modification of existing 9 repository classes required
-2. **Indirection**: Need to reference separate file to check table definitions
+1. **Distributed definitions**: Table definitions are spread across multiple files
+2. **Potential duplication**: Similar patterns repeated in each repository
 
 ## Alternatives Considered
 
@@ -129,5 +146,15 @@ Create schema definitions by reverse-engineering from the database.
 3. **Test strategy**: Add tests to ensure accuracy of schema definitions
 4. **Documentation generation**: Auto-generate documentation from schema definitions
 
+## Update History
+- **January 2026**: Updated documentation to reflect actual implementation
+  - Removed references to non-existent DATABASE_SCHEMA object and schema/tables/ directory
+  - Updated to reflect inline CREATE_TABLE_SQL pattern per repository
+  - Corrected repository-table mapping
+  - Added documentation for file-based repositories (SettingsRepository, McpAppsManagerRepository)
+  - Corrected table name: hooks to hook_modules
+- **August 2025**: Initial schema management documentation
+
 ## References
 - [DATABASE_ARCHITECTURE.md](DATABASE_ARCHITECTURE.md) - Overall database architecture design
+- [DATABASE_DESIGN_PATTERNS.md](DATABASE_DESIGN_PATTERNS.md) - Database design patterns

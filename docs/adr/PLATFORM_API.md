@@ -23,16 +23,19 @@ Initially, Electron's `window.electronAPI` was implemented with a flat structure
 Related features were reorganized into logical domains and structured into main domain APIs:
 
 ```typescript
-// packages/shared/src/types/platform-api/ipc.ts
+// packages/shared/src/types/platform-api.ts
 interface PlatformAPI {
   app: AppAPI;             // Application management (including token management)
   auth: AuthAPI;           // Authentication and authorization
-  hooks: HookAPI;          // MCP hook management
-  log: LogAPI;             // Log management
-  package: PackageAPI;     // Package management (including system utilities)
-  server: ServerAPI;       // MCP server management
+  cloudSync: CloudSyncAPI; // Cloud synchronization
+  logs: LogAPI;            // Log management
+  packages: PackageAPI;    // Package management (including system utilities)
+  projects: ProjectsAPI;   // Projects management
+  servers: ServerAPI;      // MCP server management
   settings: SettingsAPI;   // Application settings
-  workspace: WorkspaceAPI; // Workspace management
+  skills: SkillsAPI;       // Skills management
+  workflows: WorkflowAPI;  // Workflow and hook management
+  workspaces: WorkspaceAPI; // Workspace management
 }
 ```
 
@@ -41,16 +44,15 @@ interface PlatformAPI {
 ### Current Codebase Structure
 
 1. **Type definition locations**
-   - `packages/shared/src/types/platform-api/ipc.ts`: Main interface definitions
+   - `packages/shared/src/types/platform-api.ts`: Main interface definitions
    - `packages/shared/src/types/platform-api/domains/`: Type definitions for each domain API
-   - `apps/electron/src/lib/platform-api/types/platform-api.ts`: Electron-specific type definitions
 
 2. **Implementation**
-   - `apps/electron/src/frontend/lib/electron-platform-api.ts`: Implementation for Electron environment
-   - `apps/electron/src/frontend/lib/remote-platform-api.ts`: Implementation for remote (Web) environment
+   - `apps/electron/src/renderer/platform-api/electron-platform-api.ts`: Implementation for Electron environment
+   - `apps/electron/src/renderer/platform-api/remote-platform-api.ts`: Implementation for remote (Web) environment
 
 3. **Backend Management**
-   - `apps/electron/src/main/platform-api-manager.ts`: API switching based on workspace
+   - `apps/electron/src/main/modules/workspace/platform-api-manager.ts`: API switching based on workspace
 
 ### Responsibilities of Each Domain API
 
@@ -92,11 +94,26 @@ interface PlatformAPI {
 - Active workspace management
 - Workspace change monitoring
 
-#### HookAPI
-- MCP hook CRUD operations
-- Hook enable/disable
-- Hook execution order management
-- Pre/post hook processing
+#### WorkflowAPI
+- Workflow CRUD operations
+- Workflow enable/disable
+- Workflow execution order management
+- Pre/post workflow processing
+
+#### CloudSyncAPI
+- Cloud synchronization status
+- Sync trigger and management
+- Conflict resolution
+
+#### ProjectsAPI
+- Project CRUD operations
+- Project configuration management
+- Project-server associations
+
+#### SkillsAPI
+- Skills discovery and management
+- Skills installation and removal
+- Skills configuration
 
 ## Architecture Characteristics
 

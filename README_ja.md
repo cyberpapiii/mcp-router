@@ -43,6 +43,16 @@
 
 [リリースページ](https://github.com/mcp-router/mcp-router/releases)からダウンロード可能です。
 
+MCP Routerのセットアップ後、CLIを使用して接続できます：
+```bash
+# MCP Routerトークンを設定（カスタムアプリ追加時に発行されます）
+export MCPR_TOKEN="mcpr_your_token"
+# MCP Routerに接続するには：
+npx -y @mcp_router/cli connect
+
+# プロジェクトを使用する場合：
+npx -y @mcp_router/cli connect --project <project-name>
+```
 
 ## 🚀 機能
 

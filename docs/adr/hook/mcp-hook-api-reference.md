@@ -34,20 +34,25 @@ interface HookContext {
   // Pure MCP response (available only in Post-hook)
   response?: any;          // Response from the server
 
+  // Workflow execution context (passed by workflow-executor.ts)
+  workflowId: string;      // ID of the current workflow
+  workflowName: string;    // Name of the current workflow
+  nodeId: string;          // ID of the current hook node
+  nodeName: string;        // Name/label of the current hook node
+  previousResults: any[];  // Results from previous nodes in the workflow
+
   // Application-specific metadata
   metadata: {
-    // Client information (required)
-    clientId: string;      // Client ID
-
     // Server information (optional)
-    serverId?: string;     // Server ID
     serverName?: string;   // Server name
 
     // Error information
     error?: Error;         // Error information (Post-hook only)
 
-    // Shared data between Hooks
-    shared?: Record<string, any>;  // Area for sharing data between Hooks
+    // NOT IMPLEMENTED - Planned for future:
+    // clientId: string;              // Client ID - not currently passed
+    // serverId?: string;             // Server ID - not currently passed
+    // shared?: Record<string, any>;  // Shared data between Hooks - not currently implemented
   };
 }
 ```
@@ -55,34 +60,38 @@ interface HookContext {
 #### `console`
 Object for log output:
 - `console.log(...args)` - Information log
-- `console.info(...args)` - Information log
 - `console.warn(...args)` - Warning log
 - `console.error(...args)` - Error log
 
 ### Available Utility Functions
 
-#### `sleep(ms: number): Promise<void>`
+> **NOTE**: The following utility functions are **NOT IMPLEMENTED** in the current sandbox environment. They are documented here for future reference.
+
+#### `sleep(ms: number): Promise<void>` - NOT IMPLEMENTED
 Pauses processing for the specified number of milliseconds.
 
 ```javascript
+// NOT AVAILABLE IN CURRENT SANDBOX
 await sleep(1000); // Wait 1 second
 ```
 
-#### `getServerInfo(serverId: string): object`
+#### `getServerInfo(serverId: string): object` - NOT IMPLEMENTED
 Gets server information (currently a simplified implementation).
 
 ```javascript
+// NOT AVAILABLE IN CURRENT SANDBOX
 const serverInfo = getServerInfo(context.metadata.serverId);
 console.log("Server name:", serverInfo.name);
 ```
 
-#### `fetch(url: string, options?: object): Promise<Response>`
+#### `fetch(url: string, options?: object): Promise<Response>` - NOT IMPLEMENTED
 Sends HTTPS requests. For security reasons, the following restrictions apply:
 - Only HTTPS URLs are allowed (HTTP is not allowed)
 - Timeout is 3 seconds
 - cookie and authorization headers are automatically removed
 
 ```javascript
+// NOT AVAILABLE IN CURRENT SANDBOX
 // GET request
 const response = await fetch('https://api.example.com/data');
 const data = await response.json();
@@ -127,6 +136,8 @@ interface HookResult {
   };
 }
 ```
+
+> **NOTE**: Return values are not currently validated for flow control. The `continue: false` flag and `error` object are captured but may not halt workflow execution in all cases. This behavior is planned for future enhancement.
 
 ## Sample Code
 

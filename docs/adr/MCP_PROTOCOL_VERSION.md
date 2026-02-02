@@ -1,6 +1,6 @@
 # MCP Protocol Version Header
 
-The MCP-Protocol-Version header is automatically handled by @modelcontextprotocol/sdk v1.25.1+.
+The MCP-Protocol-Version header is automatically handled by @modelcontextprotocol/sdk v1.25.2+ (enforced via pnpm override).
 No manual implementation required in mcp-router.
 
 ## Verification

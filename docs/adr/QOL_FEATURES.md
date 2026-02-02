@@ -41,7 +41,7 @@ All endpoints require Bearer token authentication.
 
 ### 2. SSE Events
 
-**Location:** `apps/electron/src/main/modules/event-bridge/event-bridge.service.ts`
+**Location:** `apps/electron/src/main/modules/mcp-server-runtime/event-bridge.ts`
 
 EventBridge service broadcasts IPC events to SSE clients at `/api/events`:
 
@@ -68,12 +68,12 @@ Integrates official MCP Registry API at `registry.modelcontextprotocol.io`:
 
 ### 4. Hot Reload for Development
 
-**Location:** `apps/electron/src/main/modules/dev-watcher/dev-watcher.service.ts`
+**Location:** `apps/electron/src/main/modules/mcp-server-manager/dev-watcher.service.ts`
 
 DevWatcherService uses chokidar for file watching:
 
 - Watches servers with `dev.enabled: true` in configuration
-- Monitors `dev.watchPaths` directories for changes
+- Monitors `dev.watch` directories for changes
 - 500ms debounce to batch rapid file changes
 - Auto-restarts server on detected changes
 - Ignores `node_modules`, `.git`, and common build artifacts
@@ -83,7 +83,7 @@ Configuration in server definition:
 {
   "dev": {
     "enabled": true,
-    "watchPaths": ["./src"],
+    "watch": ["./src"],
     "command": "npm run dev"
   }
 }
@@ -91,7 +91,7 @@ Configuration in server definition:
 
 ### 5. Structured Logging
 
-**Location:** `apps/electron/src/main/modules/logging/logging.service.ts`
+**Location:** `apps/electron/src/main/utils/logger-factory.ts`
 
 Pino-based structured logging with XDG-compliant file output:
 
@@ -99,7 +99,7 @@ Pino-based structured logging with XDG-compliant file output:
 - Log levels: trace, debug, info, warn, error, fatal
 - Automatic log file rotation by date
 - 30-day log retention with automatic cleanup
-- File output to `~/.local/share/mcp-router/logs/` (XDG_DATA_HOME)
+- File output to `~/.local/state/mcp-router/logs/` (XDG_STATE_HOME)
 - Configurable log level via settings
 
 Log format:
@@ -142,7 +142,7 @@ Log format:
                           ↓
 ┌─────────────────────────────────────────────────────────────┐
 │                  LoggingService (Pino)                       │
-│           ~/.local/share/mcp-router/logs/                    │
+│           ~/.local/state/mcp-router/logs/                    │
 └─────────────────────────────────────────────────────────────┘
 ```
 

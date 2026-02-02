@@ -101,21 +101,51 @@ interface WorkflowHook {
 Hook scripts are managed by the Workflow Engine and executed in the following environment:
 
 ```javascript
-// Hook Context
+// Hook Context (actual implementation from workflow-executor.ts)
 {
   request: {
     method: string,    // MCP method name
     params: any        // Request parameters
   },
   response?: any,      // Response for Post-hook
+
+  // Workflow execution context (IMPLEMENTED)
+  workflowId: string,      // ID of the current workflow
+  workflowName: string,    // Name of the current workflow
+  nodeId: string,          // ID of the current hook node
+  nodeName: string,        // Name/label of the current hook node
+  previousResults: any[],  // Results from previous nodes
+
   metadata: {
-    clientId: string,
-    serverName?: string,
-    workflowId: string,
-    nodeId: string
+    serverName?: string,   // Server name (optional)
+    error?: Error          // Error information (Post-hook only)
+
+    // NOT IMPLEMENTED - Planned for future:
+    // clientId: string,              // Not currently passed
+    // serverId?: string,             // Not currently passed
+    // shared?: Record<string, any>,  // Shared data between hooks
   }
 }
 ```
+
+**Implementation Status:**
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| `request` object | IMPLEMENTED | Full MCP request data |
+| `response` object | IMPLEMENTED | Available in post-hooks |
+| `workflowId`, `workflowName` | IMPLEMENTED | Workflow context |
+| `nodeId`, `nodeName` | IMPLEMENTED | Current node context |
+| `previousResults` | IMPLEMENTED | Results from prior nodes |
+| `metadata.serverName` | IMPLEMENTED | Server name when available |
+| `metadata.error` | IMPLEMENTED | Error info in post-hooks |
+| `metadata.clientId` | NOT IMPLEMENTED | Planned for future |
+| `metadata.serverId` | NOT IMPLEMENTED | Planned for future |
+| `metadata.shared` | NOT IMPLEMENTED | Planned for future |
+| `console.log/warn/error` | IMPLEMENTED | Logging available |
+| `sleep()` utility | NOT IMPLEMENTED | Not in sandbox |
+| `getServerInfo()` utility | NOT IMPLEMENTED | Not in sandbox |
+| `fetch()` utility | NOT IMPLEMENTED | Not in sandbox |
 
 ### 5. Execution Flow
 

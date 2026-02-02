@@ -21,6 +21,8 @@ apps/electron/src/
 ├── main/                    # Main process
 │   ├── modules/            # Module layer (business logic)
 │   │   ├── auth/           # Authentication
+│   │   ├── cloud-sync/     # Cloud synchronization
+│   │   ├── marketplace/    # Marketplace
 │   │   ├── mcp-apps-manager/ # MCP app management
 │   │   │   └── (mcp-client, token-manager, etc.)
 │   │   ├── mcp-logger/     # MCP log management
@@ -28,8 +30,11 @@ apps/electron/src/
 │   │   │   └── dxt-processor/ # DXT data processing
 │   │   ├── mcp-server-runtime/ # MCP server runtime
 │   │   │   └── http/       # HTTP server
+│   │   ├── projects/       # Projects management
 │   │   ├── settings/       # Settings management
+│   │   ├── skills/         # Skills management
 │   │   ├── system/         # System management
+│   │   ├── tool-catalog/   # Tool catalog management
 │   │   ├── workflow/       # Workflow and hook management
 │   │   └── workspace/      # Workspace management
 │   ├── infrastructure/     # Infrastructure layer
@@ -52,7 +57,6 @@ apps/electron/src/
 │   ├── services/           # Renderer services
 │   ├── stores/             # State management (Zustand)
 │   └── utils/              # Renderer utilities
-└── types/                  # Type definitions
 ```
 
 ### Layer Responsibilities

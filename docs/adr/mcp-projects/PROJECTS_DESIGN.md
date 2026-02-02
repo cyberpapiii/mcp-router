@@ -24,9 +24,9 @@
   - createdAt: number (unix ms)
   - updatedAt: number (unix ms)
   - optimization: ProjectOptimization ("bm25" | "cloud" | null)
-    - Context Optimization (Tool Catalog) の設定
-    - null: 無効、"bm25": BM25検索有効、"cloud": クラウド検索有効
-    - 新規プロジェクト作成時のデフォルト: "bm25"
+    - Context Optimization (Tool Catalog) setting
+    - null: disabled, "bm25": BM25 search enabled, "cloud": cloud search enabled
+    - Default for new projects: "bm25" (defined as `DEFAULT_SEARCH_STRATEGY` constant)
 
 - MCPServer (existing)
   - Add: `projectId?: string | null` (single assignment)

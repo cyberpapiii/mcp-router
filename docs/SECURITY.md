@@ -95,11 +95,11 @@ Path Traversal and File System Access Vulnerabilities
 ### Affected Locations
 - apps/electron/src/main/utils/uri-utils.ts
 - apps/electron/src/main/modules/mcp-server-runtime/request-handlers.ts
-- mcp-router/mcp-router/apps/electron/src/main/modules/mcp-server-manager/dxt-processor/dxt-processor.ts
-- mcp-router/mcp-router/apps/electron/src/main/modules/mcp-server-manager/dxt-processor/dxt-converter.ts
+- apps/electron/src/main/modules/mcp-server-manager/dxt-processor/dxt-processor.ts
+- apps/electron/src/main/modules/mcp-server-manager/dxt-processor/dxt-converter.ts
 - apps/electron/src/main/modules/mcp-server-manager/mcp-server-manager.ipc.ts
-- mcp-router/mcp-router/apps/electron/src/main/modules/workspace/workspace.service.ts
-- mcp-router/mcp-router/apps/electron/src/main/infrastructure/database/sqlite-manager.ts
+- apps/electron/src/main/modules/workspace/workspace.service.ts
+- apps/electron/src/main/infrastructure/database/sqlite-manager.ts
 
 parseResourceUri() extracts path without validation: path: match[2] containing traversal sequences; workspace.service.ts constructs paths: path.join(app.getPath("userData"), dbPath) where dbPath contains "../../../etc/passwd"
 
@@ -122,8 +122,8 @@ Arbitrary Code Execution via Hooks and Workflow System
 - apps/electron/src/main/modules/workflow/workflow.ipc.ts
 - apps/electron/src/main/modules/workflow/hook.service.ts
 - apps/electron/src/main/modules/workflow/workflow-executor.ts
-- mcp-router/mcp-router/apps/electron/src/main/modules/workflow/hook.repository.ts
-- mcp-router/mcp-router/apps/electron/src/main/modules/workflow/workflow.repository.ts
+- apps/electron/src/main/modules/workflow/hook.repository.ts
+- apps/electron/src/main/modules/workflow/workflow.repository.ts
 - apps/electron/src/main/modules/mcp-server-runtime/request-handler-base.ts
 
 hook.service.ts line 196: vmScript.runInContext(vmContext, {timeout: 5000}) - where vmContext contains escapable sandbox with Object/Array constructors allowing access to Node.js process object
@@ -143,11 +143,11 @@ Solutions to fix this vulnerability are as follows: First, implement stricter va
 Unencrypted Storage of Sensitive Authentication Data
 
 ### Affected Locations
-- mcp-router/mcp-router/apps/electron/src/main/modules/mcp-server-manager/mcp-server-manager.repository.ts
-- mcp-router/mcp-router/apps/electron/src/main/modules/workspace/workspace.repository.ts
-- mcp-router/mcp-router/apps/electron/src/main/modules/mcp-logger/mcp-logger.repository.ts
-- mcp-router/mcp-router/apps/electron/src/main/modules/auth/auth.service.ts
-- mcp-router/mcp-router/apps/electron/src/main/modules/settings/settings.repository.ts
+- apps/electron/src/main/modules/mcp-server-manager/mcp-server-manager.repository.ts
+- apps/electron/src/main/modules/workspace/workspace.repository.ts
+- apps/electron/src/main/modules/mcp-logger/mcp-logger.repository.ts
+- apps/electron/src/main/modules/auth/auth.service.ts
+- apps/electron/src/main/modules/settings/settings.repository.ts
 
 1) Line 235 in mcp-server-manager.repository.ts: `bearer_token: bearerToken` stores plaintext tokens 2) Line 117 in shared-config-manager.ts: JSON.stringify saves plaintext authToken to file 3) Line 160 in workspace.repository.ts: base64 encoded token without encryption 4) Line 149 in mcp-logger.repository.ts: JSON.stringify may store sensitive request parameters
 

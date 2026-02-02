@@ -39,38 +39,47 @@ We adopt a self-contained structure organized by feature modules (Modular Archit
 apps/electron/src/main/
 ├── modules/                 # Feature modules (self-contained) - Future target structure
 │   ├── auth/               # Authentication module
-│   │   ├── auth.service.ts        # Business logic
-│   │   ├── auth.repository.ts     # Data access
 │   │   ├── auth.ipc.ts           # IPC handlers
-│   │   ├── auth.types.ts         # Type definitions
-│   │   └── __tests__/            # Tests
-│   │       ├── auth.service.test.ts
-│   │       └── auth.repository.test.ts
+│   │   └── auth.service.ts       # Business logic
 │   │
-│   ├── mcp/                # MCP module
-│   │   ├── mcp.service.ts
-│   │   ├── mcp.repository.ts
-│   │   ├── mcp.ipc.ts
-│   │   ├── mcp.types.ts
-│   │   └── __tests__/
+│   ├── cloud-sync/         # Cloud synchronization module
+│   │
+│   ├── marketplace/        # Marketplace module
+│   │
+│   ├── mcp-apps-manager/   # MCP app management module
+│   │
+│   ├── mcp-logger/         # MCP logging module
+│   │
+│   ├── mcp-server-manager/ # MCP server management module
+│   │
+│   ├── mcp-server-runtime/ # MCP server runtime module
+│   │
+│   ├── projects/           # Projects module
+│   │
+│   ├── skills/             # Skills module
+│   │
+│   ├── tool-catalog/       # Tool catalog module
 │   │
 │   ├── workflow/           # Workflow module
 │   │   ├── workflow.service.ts
 │   │   ├── workflow.repository.ts
 │   │   ├── workflow.ipc.ts
-│   │   ├── workflow.types.ts
 │   │   └── __tests__/
 │   │
 │   └── workspace/          # Workspace module
 │       ├── workspace.service.ts
 │       ├── workspace.repository.ts
 │       ├── workspace.ipc.ts
-│       ├── workspace.types.ts
 │       └── __tests__/
 ├── utils/                 # Utilities
 │   ├── logger.ts
-│   ├── fetch.ts
-│   └── environment.ts
+│   ├── logger-factory.ts
+│   ├── fetch-utils.ts
+│   ├── environment.ts
+│   ├── env-utils.ts
+│   ├── log-cleanup.ts
+│   ├── url-validation-utils.ts
+│   └── uri-utils.ts
 │
 └── main.ts                # Application entry point
 ```

@@ -28,7 +28,7 @@ Target state:
 
 ---
 
-## Task 1: Create ConnectionMonitor Utility Class
+## Task 1: Create ConnectionMonitor Utility Class [DONE]
 
 **Files:**
 - Create: `apps/electron/src/main/modules/mcp-server-manager/connection-monitor.ts`
@@ -322,7 +322,7 @@ git commit -m "feat(connection-monitor): add ConnectionMonitor utility with expo
 
 ---
 
-## Task 2: Create HealthChecker for HTTP Transport
+## Task 2: Create HealthChecker for HTTP Transport [DONE]
 
 **Files:**
 - Create: `apps/electron/src/main/modules/mcp-server-manager/health-checker.ts`
@@ -601,7 +601,7 @@ git commit -m "feat(health-checker): add periodic health check utility for HTTP 
 
 ---
 
-## Task 3: Create ReconnectingMCPClient Wrapper
+## Task 3: Create ReconnectingMCPClient Wrapper [DONE]
 
 **Files:**
 - Create: `apps/electron/src/main/modules/mcp-server-manager/reconnecting-mcp-client.ts`
@@ -939,7 +939,7 @@ git commit -m "feat(reconnecting-client): add ReconnectingMCPClient wrapper with
 
 ---
 
-## Task 4: Integrate ReconnectingMCPClient into MCPServerManager
+## Task 4: Integrate ReconnectingMCPClient into MCPServerManager [DONE]
 
 **Files:**
 - Modify: `apps/electron/src/main/modules/mcp-server-manager/mcp-server-manager.ts`
@@ -1152,7 +1152,7 @@ git commit -m "feat(mcp-server-manager): integrate ReconnectingMCPClient for aut
 
 ---
 
-## Task 5: Update MCPAggregator to Handle Reconnections
+## Task 5: Update MCPAggregator to Handle Reconnections [DONE]
 
 **Files:**
 - Modify: `apps/cli/src/mcp-aggregator.ts`
@@ -1215,7 +1215,7 @@ git commit -m "feat(mcp-aggregator): add handleClientReconnected method to refre
 
 ---
 
-## Task 6: Add UI Status Indicators for Connection State
+## Task 6: Add UI Status Indicators for Connection State [DONE]
 
 **Files:**
 - Modify: `packages/shared/src/types/mcp-types.ts` (if needed)
@@ -1246,7 +1246,7 @@ git commit -m "feat(types): update MCPServer status type for connection states"
 
 ---
 
-## Task 7: Manual Integration Testing
+## Task 7: Manual Integration Testing [PENDING]
 
 **Step 1: Test SSE reconnection**
 

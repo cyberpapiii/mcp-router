@@ -42,12 +42,29 @@
 
 可在 [GitHub 发布页](https://github.com/mcp-router/mcp-router/releases) 获取最新版本。
 
+安装 MCP Router 后，您可以使用 CLI 连接：
+```bash
+# 设置 MCP Router 令牌（添加自定义应用时颁发）
+export MCPR_TOKEN="mcpr_your_token"
+# 连接到 MCP Router：
+npx -y @mcp_router/cli connect
+
+# 如果您想使用项目，运行：
+npx -y @mcp_router/cli connect --project <project-name>
+```
+
 ## 🚀 功能亮点
 
 ### 📊 集中式服务器管理
-在单一控制面板中轻松切换 MCP 服务器的启用状态
+在单一控制面板中轻松切换 MCP 服务器的启用/禁用状态，启用/禁用单个工具，并将服务器组织到项目和工作区中
 
 <img src="https://raw.githubusercontent.com/mcp-router/mcp-router/main/public/images/readme/toggle.png" alt="服务器管理" width="600">
+
+<img src="https://raw.githubusercontent.com/mcp-router/mcp-router/main/public/images/readme/tool-toggle.png" alt="工具切换" width="600">
+
+<img src="https://raw.githubusercontent.com/mcp-router/mcp-router/main/public/images/readme/project-management.png" alt="项目管理" width="600">
+
+<img src="https://raw.githubusercontent.com/mcp-router/mcp-router/main/public/images/readme/workspace.png" alt="工作区管理" width="600">
 
 ### 🌐 通用连接能力
 支持添加与连接任意 MCP 服务器，无论是本地还是远程环境

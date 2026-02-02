@@ -74,31 +74,35 @@ export class SqliteManager {
 - Transaction management
 - Prepared statement management
 
-### 3. Singleton Management via RepositoryFactory
+### 3. Singleton Pattern via getInstance()
+
+Each repository implements its own singleton pattern using a static `getInstance()` method:
 
 ```typescript
-export class RepositoryFactory {
-  private static instances: Record<string, any> = {};
-  private static currentDb: SqliteManager | null = null;
+export class ExampleRepository extends BaseRepository<Example> {
+  private static instance: ExampleRepository | null = null;
 
-  public static getRepository<T>(
-    RepositoryClass: new (db: SqliteManager) => T,
-    db: SqliteManager
-  ): T {
-    if (this.isDatabaseChanged(db)) {
-      this.resetAllInstances();
-      this.currentDb = db;
+  private constructor() {
+    super(getSqliteManager(), "examples");
+  }
+
+  public static getInstance(): ExampleRepository {
+    if (!ExampleRepository.instance) {
+      ExampleRepository.instance = new ExampleRepository();
     }
+    return ExampleRepository.instance;
+  }
 
-    const key = RepositoryClass.name;
-    if (!this.instances[key]) {
-      this.instances[key] = new RepositoryClass(db);
-    }
-
-    return this.instances[key];
+  public static resetInstance(): void {
+    ExampleRepository.instance = null;
   }
 }
 ```
+
+This pattern provides:
+- Lazy initialization of repository instances
+- Consistent access pattern across all repositories
+- Ability to reset instances during database switching via `resetInstance()`
 
 ### 4. Entity Mapping Strategy
 
@@ -193,6 +197,11 @@ Use existing ORMs like TypeORM or Prisma.
 2. **Caching strategy**: Caching of frequently accessed data
 3. **Audit logging**: Automatic recording of data changes
 4. **Performance optimization**: Review of index strategy
+
+## Update History
+- **January 2026**: Updated singleton pattern documentation
+  - Replaced RepositoryFactory pattern with per-repository getInstance() pattern
+  - Updated code examples to reflect actual implementation
 
 ## References
 - [DATABASE_ARCHITECTURE.md](DATABASE_ARCHITECTURE.md) - Overall database architecture

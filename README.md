@@ -13,7 +13,7 @@
 
 ## 🎯 Overview
 
-**MCP Router** is a desktop application for simplifies the management of Model Context Protocol (MCP) servers.
+**MCP Router** is a desktop application that simplifies the management of Model Context Protocol (MCP) servers.
 
 ### ✨ Key Features
 

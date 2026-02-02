@@ -17,34 +17,31 @@ The database layer of the Electron application needs to support multiple workspa
 ### Directory Structure
 
 ```
-apps/electron/src/main/infrastructure/database/
-├── core/                      # Core database functionality
-│   ├── base-repository.ts     # Repository base class
-│   ├── database-context.ts    # Database context management
-│   └── sqlite-manager.ts      # SQLite connection management
-├── factories/                 # Factory pattern implementation
-│   └── repository-factory.ts  # Repository instance management
-├── migrations/                # Database migrations
-│   ├── main-database-migration.ts  # Basic migration
-│   └── workspace-main-database-migration.ts
-├── repositories/              # Repository implementations
-│   ├── log/                  # Log repository
-│   ├── server/               # Server repository
-│   ├── settings/             # Settings repository
-│   ├── token/                # Token repository
-│   └── workspace/            # Workspace repository
-├── schema/                   # Schema definitions
-│   ├── database-schema.ts    # Unified schema
-│   ├── schema-utils.ts       # Schema utilities
-│   └── tables/               # Individual table definitions
-│       ├── hooks.ts
-│       ├── migrations.ts
-│       ├── request-logs.ts
-│       ├── servers.ts
-│       ├── settings.ts
-│       ├── tokens.ts
-│       └── workspaces.ts
-└── ipc.ts                  # Public API
+apps/electron/src/main/
+├── infrastructure/database/           # Core database functionality
+│   ├── base-repository.ts             # Repository base class
+│   ├── sqlite-manager.ts              # SQLite connection management
+│   └── main-database-migration.ts     # Database migrations
+│
+└── modules/                           # Modular repository structure
+    ├── mcp-logger/
+    │   └── mcp-logger.repository.ts   # Request logs repository
+    ├── mcp-server-manager/
+    │   └── mcp-server-manager.repository.ts  # Server repository
+    ├── mcp-apps-manager/
+    │   └── mcp-apps-manager.repository.ts    # Token repository (file-based)
+    ├── settings/
+    │   └── settings.repository.ts     # Settings repository (file-based)
+    ├── workspace/
+    │   └── workspace.repository.ts    # Workspace repository
+    ├── workflow/
+    │   ├── hook.repository.ts         # Hook modules repository
+    │   └── workflow.repository.ts     # Workflow repository
+    ├── skills/
+    │   ├── skills.repository.ts       # Skills repository
+    │   └── agent-path.repository.ts   # Agent path repository
+    └── projects/
+        └── projects.repository.ts     # Projects repository
 ```
 
 ### Architecture Patterns
@@ -66,52 +63,31 @@ export abstract class BaseRepository<T extends { id: string }> {
 
 Each entity's repository inherits from `BaseRepository` and adds entity-specific operations.
 
-#### 2. Factory Pattern
+#### 2. Singleton Pattern
+Each repository uses a static `getInstance()` singleton pattern for instance management:
+
 ```typescript
-export class RepositoryFactory {
-  private static instances: RepositoryInstances = {
-    server: null,
-    log: null,
-    // ...
-  };
+export class ExampleRepository extends BaseRepository<Example> {
+  private static instance: ExampleRepository | null = null;
 
-  public static getServerRepository(db: SqliteManager): ServerRepository {
-    if (this.isDatabaseChanged(db)) {
-      this.resetAllInstances();
-      this.currentDb = db;
+  private constructor() {
+    super(getSqliteManager(), "examples");
+  }
+
+  public static getInstance(): ExampleRepository {
+    if (!ExampleRepository.instance) {
+      ExampleRepository.instance = new ExampleRepository();
     }
+    return ExampleRepository.instance;
+  }
 
-    if (!this.instances.server) {
-      this.instances.server = new ServerRepository(db);
-    }
-
-    return this.instances.server;
+  public static resetInstance(): void {
+    ExampleRepository.instance = null;
   }
 }
 ```
 
-Centralizes the creation and management of repository instances, ensuring consistency during database switches.
-
-#### 3. Context Pattern
-```typescript
-export class DatabaseContext {
-  private currentDatabase: SqliteManager | null = null;
-
-  public async getCurrentDatabase(): Promise<SqliteManager> {
-    if (this.currentDatabase) {
-      return this.currentDatabase;
-    }
-
-    if (!this.databaseProvider) {
-      throw new Error("Database provider not configured");
-    }
-
-    return await this.databaseProvider();
-  }
-}
-```
-
-Manages the database context for the current workspace, maintaining consistency across the application.
+Each repository manages its own singleton instance, with a `resetInstance()` method for database switching scenarios.
 
 ### Database Selection: SQLite + better-sqlite3
 
@@ -131,33 +107,36 @@ Manages the database context for the current workspace, maintaining consistency 
 #### Processing During Workspace Switch
 1. Close the current database connection
 2. Open the new workspace's database
-3. RepositoryFactory resets all repository instances
-4. Recreate repositories with the new database
+3. Call `resetInstance()` on each repository to clear singleton instances
+4. New repository instances are created on next `getInstance()` call
 
 ### Schema Management
 
-#### Integration with Type Definitions
-```typescript
-// Schema definition
-export const serversTableSchema = {
-  id: "TEXT PRIMARY KEY",
-  name: "TEXT NOT NULL",
-  config: "TEXT NOT NULL", // JSON
-  // ...
-};
+#### Inline Table Definitions
+Each repository defines its own table schema using inline SQL within the repository class:
 
-// Automatically synced with type definitions
-export type ServerRecord = {
-  id: string;
-  name: string;
-  config: string;
-  // ...
-};
+```typescript
+export class McpServerManagerRepository extends BaseRepository<Server> {
+  private static readonly CREATE_TABLE_SQL = `
+    CREATE TABLE IF NOT EXISTS servers (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      config TEXT NOT NULL,
+      -- ... additional columns
+    )
+  `;
+
+  protected initializeTable(): void {
+    this.db.execute(McpServerManagerRepository.CREATE_TABLE_SQL);
+    // Create indexes as needed
+    this.db.execute("CREATE INDEX IF NOT EXISTS idx_servers_name ON servers(name)");
+  }
+}
 ```
 
 #### Migration Strategy
-1. **Automatic migration**: Executed at application startup
-2. **Version management**: Managed via migrations table
+1. **Automatic table initialization**: Each repository creates its table on first instantiation
+2. **Migration file**: `main-database-migration.ts` handles ALTER TABLE operations for existing tables
 3. **Backward compatibility**: Protection of existing data
 
 ### Performance Optimization
@@ -223,12 +202,32 @@ const stmt = this.db.prepare("INSERT INTO servers VALUES (?, ?, ?)");
 3. **Read-only replica**: Performance improvement
 4. **Automatic backup**: Periodic backup functionality
 
+## Repository Summary
+
+| Repository Class | Table Name | Storage Type | Inherits BaseRepository |
+|---|---|---|---|
+| McpServerManagerRepository | servers | SQLite | Yes |
+| McpLoggerRepository | requestLogs | SQLite | Yes |
+| WorkspaceRepository | workspaces | SQLite | Yes |
+| HookRepository | hook_modules | SQLite | No |
+| WorkflowRepository | workflows | SQLite | No |
+| SkillRepository | skills | SQLite | Yes |
+| AgentPathRepository | agent_paths | SQLite | Yes |
+| ProjectRepository | projects | SQLite | Yes |
+| SettingsRepository | N/A | SharedConfigManager (file-based) | No |
+| McpAppsManagerRepository | N/A | SharedConfigManager (file-based) | No |
+
+Note: SettingsRepository and McpAppsManagerRepository use SharedConfigManager for file-based storage instead of SQLite.
+
 ## Update History
-- **August 2025**: Unification of schema management
-  - Updated all repositories to use schema definition files
-  - Implemented centralized management via DATABASE_SCHEMA object
-  - Limited migration responsibility to modifications of existing tables only
-  - Added schema definitions for hooks and tokens tables
+- **January 2026**: Updated documentation to reflect actual implementation
+  - Corrected directory structure to show modular repository organization
+  - Replaced RepositoryFactory pattern with singleton getInstance() pattern
+  - Updated schema management to reflect inline CREATE_TABLE_SQL pattern
+  - Added missing repositories: ProjectRepository, SkillRepository, AgentPathRepository, WorkflowRepository
+  - Noted that SettingsRepository and McpAppsManagerRepository use SharedConfigManager (file-based)
+  - Corrected table name: hooks to hook_modules
+- **August 2025**: Initial architecture documentation
 
 ## References
 - [better-sqlite3 Documentation](https://github.com/WiseLibs/better-sqlite3)

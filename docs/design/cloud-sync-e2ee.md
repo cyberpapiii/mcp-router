@@ -28,11 +28,11 @@
 ## Architecture Overview
 ### Local (Electron/Router)
 - `WorkspaceService`: Provides the existing local workspace list (`mcprouter.db`).
-- `WorkspaceBundleSerializer`: Bundles the workspace list and each workspace's server configuration into a single JSON (server configs use the existing Export format).
-- `E2EKeyManager`: Handles KDF from passphrase and parameter management.
-- `ServerConfigBundleSerializer`: Serializes/restores in bulk using the existing JSON Export/Import format.
-- `ServerVaultBlobSyncService`: Handles change detection, encryption, full sync, and decryption application (no per-workspace sync).
-- `ServerVaultClient`: Cloud API calls.
+- `CloudSyncService`: Single class that handles all cloud sync operations including:
+  - KDF from passphrase and parameter management
+  - Bundling workspace list and server configurations into JSON (using existing Export format)
+  - Change detection, encryption, full sync, and decryption application
+  - Cloud API calls for blob get/update
 
 ### Cloud
 - `server_vault_blob`: Storage area for encrypted JSON blobs (cannot be decrypted).
@@ -89,14 +89,7 @@
       apiUrl: string;
     };
     // Existing JSON Export format (local workspace only)
-    mcpServers?: Record<
-      string,
-      {
-        command: string;
-        args: string[];
-        env: Record<string, string>;
-      }
-    >;
+    mcpServers?: MCPServerConfig[];
   };
   type WorkspaceBundlePayload = {
     workspaces: WorkspaceBundleEntry[];
@@ -126,49 +119,26 @@
    - `localModifiedAt`: Timestamp of last local modification
 
 ### Auto Sync Logic (syncNow)
+The actual implementation uses a simplified pull-if-newer/push-otherwise approach:
+
 ```typescript
-async function autoSync() {
+async function syncNow() {
   const remote = await fetchRemoteBlob();
+
+  // Pull if remote is newer than last sync
+  if (remote && remote.updatedAt > lastSyncedAt) {
+    const plaintext = await decrypt(remote);
+    await applyWorkspaceBundle(plaintext);
+    updateMetadata(remote.updatedAt);
+    return "pulled";
+  }
+
+  // Otherwise push local changes
   const localBundle = await serializeWorkspaceBundle();
-
-  // Case 1: No changes
-  if (remote.updatedAt <= lastSyncedAt && localModifiedAt <= lastSyncedAt) {
-    return "no_changes";
-  }
-
-  // Case 2: Local only changed
-  if (remote.updatedAt <= lastSyncedAt) {
-    // Push local changes
-    const encrypted = await encrypt(localBundle);
-    const response = await pushBlob(encrypted);
-    updateMetadata(response.updatedAt);
-    return "pushed";
-  }
-
-  // Case 3: Remote only changed
-  if (localModifiedAt <= lastSyncedAt) {
-    // Apply remote changes
-    const plaintext = await decrypt(remote);
-    await applyWorkspaceBundle(plaintext);
-    updateMetadata(remote.updatedAt);
-    return "pulled";
-  }
-
-  // Case 4: Both changed (conflict)
-  // Resolve deterministically by timestamp comparison
-  if (localModifiedAt > remote.updatedAt) {
-    // Local is newer → Prefer local
-    const encrypted = await encrypt(localBundle);
-    const response = await pushBlob(encrypted);
-    updateMetadata(response.updatedAt);
-    return "pushed";
-  } else {
-    // Remote is newer → Prefer remote
-    const plaintext = await decrypt(remote);
-    await applyWorkspaceBundle(plaintext);
-    updateMetadata(remote.updatedAt);
-    return "pulled";
-  }
+  const encrypted = await encrypt(localBundle);
+  const response = await pushBlob(encrypted);
+  updateMetadata(response.updatedAt);
+  return "pushed";
 }
 ```
 

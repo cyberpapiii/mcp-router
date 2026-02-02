@@ -12,7 +12,7 @@
 
 ## Phase 1: Quick Wins (Tool Annotations + Structured Output)
 
-### Task 1.1: Add MCPToolAnnotations Type
+### Task 1.1: Add MCPToolAnnotations Type [DONE]
 
 **Files:**
 - Modify: `packages/shared/src/types/mcp-types.ts:39-44`
@@ -81,7 +81,7 @@ EOF
 
 ---
 
-### Task 1.2: Update ToolInfo Type for Catalog
+### Task 1.2: Update ToolInfo Type for Catalog [DONE]
 
 **Files:**
 - Modify: `packages/shared/src/types/tool-catalog-types.ts:4-14`
@@ -159,7 +159,7 @@ EOF
 
 ---
 
-### Task 1.3: Pass Annotations Through Tool Catalog Service
+### Task 1.3: Pass Annotations Through Tool Catalog Service [DONE]
 
 **Files:**
 - Modify: `apps/electron/src/main/modules/tool-catalog/tool-catalog.service.ts:127-135`
@@ -204,7 +204,7 @@ EOF
 
 ---
 
-### Task 1.4: Include Annotations in Discovery Results
+### Task 1.4: Include Annotations in Discovery Results [DONE]
 
 **Files:**
 - Modify: `apps/electron/src/main/modules/tool-catalog/tool-catalog-handler.ts:243-250`
@@ -248,7 +248,7 @@ EOF
 
 ---
 
-### Task 1.5: Verify Protocol Header (SDK Check)
+### Task 1.5: Verify Protocol Header (SDK Check) [DONE]
 
 **Files:**
 - Read only: `node_modules/@modelcontextprotocol/sdk/`
@@ -282,7 +282,7 @@ EOF
 
 ## Phase 2: Security Hardening (OAuth + URL Validation)
 
-### Task 2.1: Create URL Validation Utility
+### Task 2.1: Create URL Validation Utility [PENDING]
 
 **Files:**
 - Create: `apps/electron/src/main/utils/url-validation-utils.ts`
@@ -397,7 +397,7 @@ EOF
 
 ---
 
-### Task 2.2: Add Token Expiration Support
+### Task 2.2: Add Token Expiration Support [PENDING]
 
 **Files:**
 - Modify: `packages/shared/src/types/token-types.ts`
@@ -496,7 +496,7 @@ EOF
 
 ---
 
-### Task 2.3: Add Resource Indicators Type (RFC 8707 Prep)
+### Task 2.3: Add Resource Indicators Type (RFC 8707 Prep) [PENDING]
 
 **Files:**
 - Modify: `packages/shared/src/types/token-types.ts`
@@ -552,7 +552,7 @@ EOF
 
 ## Phase 3: Elicitation Support
 
-### Task 3.1: Add Elicitation Types
+### Task 3.1: Add Elicitation Types [PENDING]
 
 **Files:**
 - Create: `packages/shared/src/types/elicitation-types.ts`
@@ -683,7 +683,7 @@ EOF
 
 ---
 
-### Task 3.2: Add Elicitation State Manager
+### Task 3.2: Add Elicitation State Manager [PENDING]
 
 **Files:**
 - Create: `apps/electron/src/main/modules/mcp-server-runtime/elicitation-manager.ts`
@@ -829,7 +829,7 @@ EOF
 
 ---
 
-### Task 3.3: Add Elicitation Capability to Aggregator
+### Task 3.3: Add Elicitation Capability to Aggregator [PENDING]
 
 **Files:**
 - Modify: `apps/electron/src/main/modules/mcp-server-runtime/aggregator-server.ts:47-53`
@@ -875,7 +875,7 @@ EOF
 
 ---
 
-### Task 3.4: Add Elicitation Request Handler
+### Task 3.4: Add Elicitation Request Handler [PENDING]
 
 **Files:**
 - Modify: `apps/electron/src/main/modules/mcp-server-runtime/request-handlers.ts`
@@ -987,7 +987,7 @@ EOF
 
 ## Phase 4: Resource Links in Tool Results
 
-### Task 4.1: Add Resource Link Transformation Utility
+### Task 4.1: Add Resource Link Transformation Utility [PENDING]
 
 **Files:**
 - Modify: `apps/electron/src/main/utils/uri-utils.ts`
@@ -1078,7 +1078,7 @@ EOF
 
 ---
 
-### Task 4.2: Apply Resource Link Transformation to Tool Calls
+### Task 4.2: Apply Resource Link Transformation to Tool Calls [PENDING]
 
 **Files:**
 - Modify: `apps/electron/src/main/modules/mcp-server-runtime/request-handlers.ts`
@@ -1169,28 +1169,28 @@ EOF
 
 ## Phase 5: Final Verification & Cleanup
 
-### Task 5.1: Run Full Type Check
+### Task 5.1: Run Full Type Check [PENDING]
 
 **Step 1: Run typecheck**
 
 Run: `pnpm typecheck`
 Expected: PASS with no errors
 
-### Task 5.2: Run Knip for Unused Code
+### Task 5.2: Run Knip for Unused Code [PENDING]
 
 **Step 1: Run knip**
 
 Run: `pnpm knip`
 Expected: No new unused exports from our changes
 
-### Task 5.3: Run Linting
+### Task 5.3: Run Linting [PENDING]
 
 **Step 1: Run lint fix**
 
 Run: `pnpm lint:fix`
 Expected: Auto-fixes applied, no blocking errors
 
-### Task 5.4: Update Documentation
+### Task 5.4: Update Documentation [PENDING]
 
 **Files:**
 - Modify: `docs/SECURITY.md`

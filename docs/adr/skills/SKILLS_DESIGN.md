@@ -50,7 +50,7 @@ interface SkillWithContent extends Skill {
 
 ## API Design
 
-Consolidated into 6 simple APIs: CRUD + actions.
+Consolidated into CRUD + actions, with a nested `agentPaths` sub-API for managing agent integrations.
 
 ```typescript
 interface SkillsAPI {
@@ -63,6 +63,14 @@ interface SkillsAPI {
   // Actions
   openFolder: (id?: string) => Promise<void>;  // Omit id to open entire skills directory
   import: () => Promise<Skill>;                 // Folder selection dialog → import
+
+  // Agent Paths sub-API
+  agentPaths: {
+    list: () => Promise<AgentPath[]>;           // List all agent paths
+    create: (input: CreateAgentPathInput) => Promise<AgentPath>;  // Add custom agent path
+    delete: (id: string) => Promise<void>;      // Remove agent path
+    selectFolder: () => Promise<string | null>; // Open folder selection dialog, return selected path
+  };
 }
 
 // enabled/content can also be updated via update
@@ -72,6 +80,11 @@ interface UpdateSkillInput {
   enabled?: boolean;
   content?: string;
 }
+
+interface CreateAgentPathInput {
+  name: string;
+  path: string;
+}
 ```
 
 ## Supported Agents
@@ -80,11 +93,11 @@ By default, 5 agents are supported and registered as initial data in the `agent_
 
 | Agent | Skills Directory |
 |-------|-----------------|
-| Claude Code | `~/.claude/skills/` |
-| OpenAI Codex | `~/.codex/skills/` |
-| GitHub Copilot | `~/.copilot/skills/` |
-| Cline | `~/.cline/skills/` |
-| OpenCode | `~/.config/opencode/skill/` |
+| Claude Code | `~/.claude/skills` |
+| OpenAI Codex | `~/.codex/skills` |
+| GitHub Copilot | `~/.copilot/skills` |
+| Cline | `~/.cline/skills` |
+| OpenCode | `~/.config/opencode/skill` |
 
 ### Custom Agent Paths
 

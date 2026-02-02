@@ -20,15 +20,11 @@ Types must only be defined in the following directories:
    - Zod schemas
    - Generated types from schemas
 
-3. **`apps/electron/src/lib/database/schema/`** - Database-specific types
+3. **`apps/electron/src/main/infrastructure/database/`** - Database-specific types
    - Table schemas
    - Database entity types
 
-4. **`apps/electron/src/lib/platform-api/types/`** - Platform API types
-   - Electron IPC API types
-   - Platform-specific interfaces
-
-5. **`apps/electron/src/frontend/stores/types/`** - Store state types
+4. **`apps/electron/src/renderer/stores/`** - Store state types
    - Frontend store state interfaces
    - Store-specific types
 

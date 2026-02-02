@@ -12,7 +12,7 @@
 
 ## Phase 1: REST API Endpoints
 
-### Task 1.1: Create API Router Module
+### Task 1.1: Create API Router Module [PENDING]
 
 **Files:**
 - Create: `apps/electron/src/main/modules/mcp-server-runtime/http/api-router.ts`
@@ -172,7 +172,7 @@ EOF
 
 ---
 
-### Task 1.2: Integrate API Router into MCPHttpServer
+### Task 1.2: Integrate API Router into MCPHttpServer [PENDING]
 
 **Files:**
 - Modify: `apps/electron/src/main/modules/mcp-server-runtime/http/mcp-http-server.ts:36-38,96-100,105-108`
@@ -234,7 +234,7 @@ EOF
 
 ## Phase 2: SSE Event Bridge
 
-### Task 2.1: Create EventBridge Service
+### Task 2.1: Create EventBridge Service [PENDING]
 
 **Files:**
 - Create: `apps/electron/src/main/modules/mcp-server-runtime/event-bridge.ts`
@@ -415,7 +415,7 @@ EOF
 
 ---
 
-### Task 2.2: Add SSE Events Endpoint
+### Task 2.2: Add SSE Events Endpoint [PENDING]
 
 **Files:**
 - Modify: `apps/electron/src/main/modules/mcp-server-runtime/http/api-router.ts`
@@ -505,7 +505,7 @@ EOF
 
 ---
 
-### Task 2.3: Connect IPC Events to EventBridge
+### Task 2.3: Connect IPC Events to EventBridge [PENDING]
 
 **Files:**
 - Modify: `apps/electron/src/main/modules/mcp-server-manager/mcp-server-manager.ipc.ts`
@@ -581,7 +581,7 @@ EOF
 
 ## Phase 3: MCP Marketplace Integration
 
-### Task 3.1: Create Marketplace Service
+### Task 3.1: Create Marketplace Service [PENDING]
 
 **Files:**
 - Create: `apps/electron/src/main/modules/marketplace/marketplace.service.ts`
@@ -818,7 +818,7 @@ EOF
 
 ---
 
-### Task 3.2: Add Marketplace IPC Handlers
+### Task 3.2: Add Marketplace IPC Handlers [PENDING]
 
 **Files:**
 - Create: `apps/electron/src/main/modules/marketplace/marketplace.ipc.ts`
@@ -888,7 +888,7 @@ EOF
 
 ---
 
-### Task 3.3: Add Marketplace REST Endpoints
+### Task 3.3: Add Marketplace REST Endpoints [PENDING]
 
 **Files:**
 - Modify: `apps/electron/src/main/modules/mcp-server-runtime/http/api-router.ts`
@@ -960,7 +960,7 @@ EOF
 
 ## Phase 4: Hot Reload / Dev Mode
 
-### Task 4.1: Create Dev Mode Watcher Service
+### Task 4.1: Create Dev Mode Watcher Service [PENDING]
 
 **Files:**
 - Create: `apps/electron/src/main/modules/mcp-server-manager/dev-watcher.service.ts`
@@ -1160,7 +1160,7 @@ EOF
 
 ---
 
-### Task 4.2: Add Dev Config to Server Schema
+### Task 4.2: Add Dev Config to Server Schema [PENDING]
 
 **Files:**
 - Modify: `packages/shared/src/types/mcp-server.ts` (or wherever MCPServerConfig is defined)
@@ -1204,7 +1204,7 @@ EOF
 
 ---
 
-### Task 4.3: Integrate Dev Watcher with Server Manager
+### Task 4.3: Integrate Dev Watcher with Server Manager [PENDING]
 
 **Files:**
 - Modify: `apps/electron/src/main/modules/mcp-server-manager/mcp-server-manager.ts`
@@ -1286,7 +1286,7 @@ EOF
 
 ## Phase 5: Structured Logging
 
-### Task 5.1: Add Pino and Create Logger Factory
+### Task 5.1: Add Pino and Create Logger Factory [PENDING]
 
 **Files:**
 - Create: `apps/electron/src/main/utils/logger-factory.ts`
@@ -1383,7 +1383,7 @@ EOF
 
 ---
 
-### Task 5.2: Update utils/logger to Use Pino
+### Task 5.2: Update utils/logger to Use Pino [PENDING]
 
 **Files:**
 - Modify: `apps/electron/src/main/utils/logger.ts`
@@ -1465,7 +1465,7 @@ EOF
 
 ---
 
-### Task 5.3: Add Log Retention Cleanup
+### Task 5.3: Add Log Retention Cleanup [PENDING]
 
 **Files:**
 - Create: `apps/electron/src/main/utils/log-cleanup.ts`
@@ -1544,7 +1544,7 @@ EOF
 
 ## Phase 6: Final Integration & Documentation
 
-### Task 6.1: Run Full Test Suite
+### Task 6.1: Run Full Test Suite [PENDING]
 
 **Step 1: Run all tests**
 
@@ -1568,7 +1568,7 @@ Expected: No unused exports flagged for new code
 
 ---
 
-### Task 6.2: Update Documentation
+### Task 6.2: Update Documentation [PENDING]
 
 **Files:**
 - Modify: `docs/adr/` - Add ADR for QoL features

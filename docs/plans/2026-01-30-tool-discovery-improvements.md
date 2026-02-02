@@ -12,7 +12,7 @@
 
 ## Phase 1: Token Efficiency & Meta-Tool Descriptions (P0)
 
-### Task 1: Add DetailLevel Type and Update SearchRequest
+### Task 1: Add DetailLevel Type and Update SearchRequest [DONE]
 
 **Files:**
 - Modify: `packages/shared/src/types/tool-catalog-types.ts`
@@ -115,7 +115,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 
 ---
 
-### Task 2: Create CLI Synonym Dictionary
+### Task 2: Create CLI Synonym Dictionary [DONE]
 
 **Files:**
 - Create: `packages/shared/src/utils/cli-synonyms.ts`
@@ -264,7 +264,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 
 ---
 
-### Task 3: Install and Configure MiniSearch
+### Task 3: Install and Configure MiniSearch [DONE]
 
 **Files:**
 - Modify: `apps/electron/package.json`
@@ -479,7 +479,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 
 ---
 
-### Task 4: Rewrite Meta-Tool Descriptions
+### Task 4: Rewrite Meta-Tool Descriptions [DONE]
 
 **Files:**
 - Modify: `apps/electron/src/main/modules/tool-catalog/tool-catalog-handler.ts`
@@ -633,7 +633,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 
 ---
 
-### Task 5: Implement detail_level in Discovery Handler
+### Task 5: Implement detail_level in Discovery Handler [DONE]
 
 **Files:**
 - Modify: `apps/electron/src/main/modules/tool-catalog/tool-catalog-handler.ts`
@@ -808,7 +808,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 
 ---
 
-### Task 6: Improve Error Messages with Recovery Hints
+### Task 6: Improve Error Messages with Recovery Hints [DONE]
 
 **Files:**
 - Modify: `apps/electron/src/main/modules/tool-catalog/tool-catalog-handler.ts`
@@ -1065,7 +1065,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 
 ## Phase 2: Hierarchical Discovery & Search Enhancement (P1)
 
-### Task 7: Implement tool_capabilities Handler
+### Task 7: Implement tool_capabilities Handler [DONE]
 
 **Files:**
 - Modify: `apps/electron/src/main/modules/tool-catalog/tool-catalog-handler.ts`
@@ -1327,7 +1327,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 
 ---
 
-### Task 8: Wire Up MiniSearch as Default Provider
+### Task 8: Wire Up MiniSearch as Default Provider [DONE]
 
 **Files:**
 - Modify: `apps/electron/src/main/modules/tool-catalog/tool-catalog.service.ts`
@@ -1447,7 +1447,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 
 ---
 
-### Task 9: Register tool_capabilities in Request Router
+### Task 9: Register tool_capabilities in Request Router [DONE]
 
 **Files:**
 - Explore and modify the request router that dispatches to meta-tool handlers
@@ -1497,7 +1497,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 
 ## Phase 3: Final Integration & Testing (P2)
 
-### Task 10: Update Exports and Documentation
+### Task 10: Update Exports and Documentation [DONE]
 
 **Files:**
 - Modify: `packages/shared/src/types/index.ts`
@@ -1542,7 +1542,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 
 ---
 
-### Task 11: End-of-Chat Verification
+### Task 11: End-of-Chat Verification [DONE]
 
 **Step 1: Run type safety check**
 

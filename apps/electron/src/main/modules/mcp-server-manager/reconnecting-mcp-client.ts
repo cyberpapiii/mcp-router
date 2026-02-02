@@ -31,6 +31,9 @@ export class ReconnectingMCPClient {
   private readonly healthCheckUrl?: string;
   private readonly healthCheckIntervalMs: number;
   private readonly bearerToken?: string;
+  private readonly maxRetries: number;
+  private readonly initialDelayMs: number;
+  private readonly maxDelayMs: number;
 
   constructor(options: ReconnectingClientOptions) {
     this.serverId = options.serverId;
@@ -40,6 +43,9 @@ export class ReconnectingMCPClient {
     this.healthCheckUrl = options.healthCheckUrl;
     this.healthCheckIntervalMs = options.healthCheckIntervalMs ?? 30000;
     this.bearerToken = options.bearerToken;
+    this.maxRetries = options.maxRetries ?? 5;
+    this.initialDelayMs = options.initialDelayMs ?? 1000;
+    this.maxDelayMs = options.maxDelayMs ?? 30000;
 
     this.client = new Client({
       name: "mcp-router",
@@ -52,9 +58,9 @@ export class ReconnectingMCPClient {
         this.onStatusChange(state);
       },
       onReconnect: () => this.attemptReconnect(),
-      maxRetries: options.maxRetries,
-      initialDelayMs: options.initialDelayMs,
-      maxDelayMs: options.maxDelayMs,
+      maxRetries: this.maxRetries,
+      initialDelayMs: this.initialDelayMs,
+      maxDelayMs: this.maxDelayMs,
     });
   }
 
@@ -64,14 +70,67 @@ export class ReconnectingMCPClient {
     }
 
     this.monitor.markConnecting();
-    this.transport = this.createTransport();
-    this.setupTransportCallbacks(this.transport);
 
-    await this.client.connect(this.transport);
-    this.monitor.markConnected();
+    // Try initial connection with retries
+    let lastError: Error | null = null;
+    for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
+      if (this.disposed) {
+        throw new Error("Client has been disposed");
+      }
 
-    // Start health checker for HTTP transports
-    this.startHealthChecker();
+      try {
+        this.transport = this.createTransport();
+        this.setupTransportCallbacks(this.transport);
+        await this.client.connect(this.transport);
+
+        // Success
+        this.monitor.markConnected();
+        this.startHealthChecker();
+        return;
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+
+        if (attempt < this.maxRetries) {
+          // Calculate delay with exponential backoff
+          const delay = Math.min(
+            this.initialDelayMs * Math.pow(2, attempt),
+            this.maxDelayMs,
+          );
+
+          console.log(
+            `[ReconnectingMCPClient] Initial connection to ${this.serverName} failed (attempt ${attempt + 1}/${this.maxRetries + 1}), retrying in ${delay}ms...`,
+          );
+
+          // Emit reconnecting state so UI shows retry progress
+          this.onStatusChange("reconnecting");
+
+          // Wait before retry
+          await this.sleep(delay);
+
+          // Recreate client for fresh connection attempt
+          try {
+            await this.client.close();
+          } catch {
+            // Ignore close errors
+          }
+          this.client = new Client({
+            name: "mcp-router",
+            version: "1.0.0",
+          });
+        }
+      }
+    }
+
+    // All retries exhausted
+    console.error(
+      `[ReconnectingMCPClient] Failed to connect to ${this.serverName} after ${this.maxRetries + 1} attempts`,
+    );
+    this.onStatusChange("failed");
+    throw lastError ?? new Error("Connection failed after all retries");
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   getClient(): Client {

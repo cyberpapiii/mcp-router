@@ -14,6 +14,12 @@ import type {
   SkillWithContent,
   CreateSkillInput,
   UpdateSkillInput,
+  UnifiedSkill,
+  ClientSkillState,
+  SetClientSkillStateInput,
+  AdoptSkillInput,
+  SkillSyncResult,
+  SkillVerifyResult,
 } from "@mcp_router/shared";
 import {
   CreateServerInput,
@@ -85,6 +91,7 @@ declare global {
       getCloudSyncStatus: () => Promise<CloudSyncStatus>;
       setCloudSyncEnabled: (enabled: boolean) => Promise<CloudSyncStatus>;
       setCloudSyncPassphrase: (passphrase: string) => Promise<void>;
+      syncCloudNow: () => Promise<CloudSyncStatus>;
 
       // MCP Apps Management
       listMcpApps: () => Promise<McpApp[]>;
@@ -200,12 +207,100 @@ declare global {
       ) => Promise<{ valid: boolean; error?: string }>;
 
       // Skills Management
-      listSkills: () => Promise<SkillWithContent[]>;
+      listSkills: () => Promise<Skill[]>;
+      getSkill: (id: string) => Promise<Skill | null>;
+      getSkillContent: (id: string) => Promise<string | null>;
+      getSkillContentFromPath: (skillPath: string) => Promise<string | null>;
+      getSkillWithContent: (id: string) => Promise<SkillWithContent | null>;
       createSkill: (input: CreateSkillInput) => Promise<Skill>;
       updateSkill: (id: string, updates: UpdateSkillInput) => Promise<Skill>;
       deleteSkill: (id: string) => Promise<void>;
       openSkillFolder: (id?: string) => Promise<void>;
       importSkill: () => Promise<Skill>;
+
+      // Unified Skills (per-client state management)
+      listUnifiedSkills: () => Promise<UnifiedSkill[]>;
+      getUnifiedSkill: (id: string) => Promise<UnifiedSkill | null>;
+      setClientSkillState: (
+        input: SetClientSkillStateInput,
+      ) => Promise<ClientSkillState>;
+      adoptSkill: (input: AdoptSkillInput) => Promise<UnifiedSkill>;
+      syncSkills: (skillId?: string) => Promise<SkillSyncResult>;
+      verifySkills: () => Promise<SkillVerifyResult>;
+      enableForClient: (skillId: string, clientId: string) => Promise<void>;
+      disableForClient: (skillId: string, clientId: string) => Promise<void>;
+      removeFromClient: (skillId: string, clientId: string) => Promise<void>;
+      enableAll: (skillId: string) => Promise<void>;
+      disableAll: (skillId: string) => Promise<void>;
+
+      // Marketplace
+      marketplaceSearch: (options?: {
+        search?: string;
+        limit?: number;
+        cursor?: string;
+      }) => Promise<{
+        servers: Array<{
+          server: {
+            name: string;
+            description: string;
+            version: string;
+            title?: string;
+            websiteUrl?: string;
+            repository?: {
+              url: string;
+              source: string;
+            };
+            icons?: Array<{
+              src: string;
+              mimeType?: string;
+            }>;
+            packages?: Array<{
+              registryType: "npm" | "pypi" | "oci";
+              identifier: string;
+              runtimeHint?: string;
+              transport: {
+                type: "stdio" | "sse" | "streamable-http";
+              };
+            }>;
+          };
+          _meta: {
+            "io.modelcontextprotocol.registry/official": {
+              status: string;
+              publishedAt: string;
+              isLatest: boolean;
+            };
+          };
+        }>;
+        metadata: {
+          nextCursor: string | null;
+          count: number;
+        };
+      }>;
+      marketplaceDetails: (serverName: string) => Promise<{
+        name: string;
+        description: string;
+        version: string;
+        title?: string;
+        websiteUrl?: string;
+        repository?: {
+          url: string;
+          source: string;
+        };
+        icons?: Array<{
+          src: string;
+          mimeType?: string;
+        }>;
+        packages?: Array<{
+          registryType: "npm" | "pypi" | "oci";
+          identifier: string;
+          runtimeHint?: string;
+          transport: {
+            type: "stdio" | "sse" | "streamable-http";
+          };
+        }>;
+      } | null>;
+      marketplaceReadme: (repoUrl: string) => Promise<string | null>;
+      marketplaceClearCache: () => Promise<{ success: boolean }>;
     };
   }
 }

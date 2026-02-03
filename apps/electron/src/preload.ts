@@ -9,6 +9,8 @@ import type {
   CreateSkillInput,
   UpdateSkillInput,
   CreateAgentPathInput,
+  CreateClientAppInput,
+  UpdateClientAppInput,
 } from "@mcp_router/shared";
 
 // Consolidate everything into one contextBridge call
@@ -80,6 +82,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("cloud-sync:set-enabled", enabled),
   setCloudSyncPassphrase: (passphrase: string) =>
     ipcRenderer.invoke("cloud-sync:set-passphrase", passphrase),
+  syncCloudNow: () => ipcRenderer.invoke("cloud-sync:sync-now"),
 
   // MCP Apps Management
   listMcpApps: () => ipcRenderer.invoke("mcp-apps:list"),
@@ -193,6 +196,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   // Skills Management
   listSkills: () => ipcRenderer.invoke("skill:list"),
+  getSkill: (id: string) => ipcRenderer.invoke("skill:get", id),
+  getSkillContent: (id: string) => ipcRenderer.invoke("skill:getContent", id),
+  getSkillContentFromPath: (skillPath: string) =>
+    ipcRenderer.invoke("skill:getContentFromPath", skillPath),
+  getSkillWithContent: (id: string) =>
+    ipcRenderer.invoke("skill:getWithContent", id),
   createSkill: (input: CreateSkillInput) =>
     ipcRenderer.invoke("skill:create", input),
   updateSkill: (id: string, updates: UpdateSkillInput) =>
@@ -209,4 +218,57 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("skill:deleteAgentPath", id),
   selectAgentPathFolder: () =>
     ipcRenderer.invoke("skill:selectAgentPathFolder"),
+
+  // Unified Skills (per-client state management)
+  listUnifiedSkills: () => ipcRenderer.invoke("skill:list-unified"),
+  getUnifiedSkill: (id: string) => ipcRenderer.invoke("skill:get-unified", id),
+  setClientSkillState: (input: {
+    skillId: string;
+    clientId: string;
+    state: string;
+  }) => ipcRenderer.invoke("skill:set-client-state", input),
+  adoptSkill: (input: { skillName: string; sourceClientId: string }) =>
+    ipcRenderer.invoke("skill:adopt", input),
+  syncSkills: (skillId?: string) =>
+    ipcRenderer.invoke("skill:sync-to-all", skillId),
+  verifySkills: () => ipcRenderer.invoke("skill:verify-and-repair"),
+  enableForClient: (skillId: string, clientId: string) =>
+    ipcRenderer.invoke("skill:enable-for-client", skillId, clientId),
+  disableForClient: (skillId: string, clientId: string) =>
+    ipcRenderer.invoke("skill:disable-for-client", skillId, clientId),
+  removeFromClient: (skillId: string, clientId: string) =>
+    ipcRenderer.invoke("skill:remove-from-client", skillId, clientId),
+  enableAll: (skillId: string) =>
+    ipcRenderer.invoke("skill:enable-all", skillId),
+  disableAll: (skillId: string) =>
+    ipcRenderer.invoke("skill:disable-all", skillId),
+
+  // Marketplace
+  marketplaceSearch: (options?: {
+    search?: string;
+    limit?: number;
+    cursor?: string;
+  }) => ipcRenderer.invoke("marketplace:search", options),
+  marketplaceDetails: (serverName: string) =>
+    ipcRenderer.invoke("marketplace:details", serverName),
+  marketplaceReadme: (repoUrl: string) =>
+    ipcRenderer.invoke("marketplace:readme", repoUrl),
+  marketplaceClearCache: () => ipcRenderer.invoke("marketplace:clearCache"),
+
+  // Client Apps Management
+  listClientApps: () => ipcRenderer.invoke("client-app:list"),
+  getClientApp: (id: string) => ipcRenderer.invoke("client-app:get", id),
+  createClientApp: (input: CreateClientAppInput) =>
+    ipcRenderer.invoke("client-app:create", input),
+  updateClientApp: (id: string, input: UpdateClientAppInput) =>
+    ipcRenderer.invoke("client-app:update", id, input),
+  deleteClientApp: (id: string) => ipcRenderer.invoke("client-app:delete", id),
+  detectClientApps: () => ipcRenderer.invoke("client-app:detect"),
+  configureClientApp: (id: string) =>
+    ipcRenderer.invoke("client-app:configure", id),
+  updateClientAppServerAccess: (id: string, serverAccess: TokenServerAccess) =>
+    ipcRenderer.invoke("client-app:update-server-access", id, serverAccess),
+  selectClientAppFolder: () => ipcRenderer.invoke("client-app:select-folder"),
+  discoverSkillsFromClients: () =>
+    ipcRenderer.invoke("client-apps:discover-skills"),
 });

@@ -1,0 +1,1314 @@
+import { promises as fsPromises } from "fs";
+import os from "os";
+import path from "path";
+import { SingletonService } from "@/main/modules/singleton-service";
+import { SkillsFileManager } from "@/main/modules/skills/skills-file-manager";
+import {
+  getSymlinkTargetPath,
+  expandHomePath,
+} from "@/main/modules/skills/skills-agent-paths";
+import { SkillRepository } from "@/main/modules/skills/skills.repository";
+import { getServerService } from "@/main/modules/mcp-server-manager/server-service";
+import {
+  isPathContained,
+  isPathAllowed,
+  validateSkillSymlinkTarget,
+} from "@/main/utils/path-security";
+import type {
+  ClientApp,
+  CreateClientAppInput,
+  UpdateClientAppInput,
+  ClientAppResult,
+  ClientDetectionResult,
+  TokenServerAccess,
+  StandardClientDefinition,
+  DiscoveredSkill,
+} from "@mcp_router/shared";
+import { STANDARD_CLIENTS } from "./client-definitions";
+import { ClientAppRepository } from "./client-app.repository";
+import {
+  detectClient,
+  detectAllClients,
+  resolveGlobPath,
+} from "./client-detector";
+
+// SVG icon imports
+import claudeIcon from "../../../../public/images/apps/claude.svg";
+import clineIcon from "../../../../public/images/apps/cline.svg";
+import windsurfIcon from "../../../../public/images/apps/windsurf.svg";
+import cursorIcon from "../../../../public/images/apps/cursor.svg";
+import vscodeIcon from "../../../../public/images/apps/vscode.svg";
+import openAiIcon from "../../../../public/images/apps/openai.svg";
+import githubIcon from "../../../../public/images/apps/github.svg";
+import opencodeIcon from "../../../../public/images/apps/opencode.svg";
+import googleIcon from "../../../../public/images/apps/google.svg";
+
+// Icon key to SVG mapping
+const ICON_MAP: Record<string, string> = {
+  claude: claudeIcon,
+  cline: clineIcon,
+  windsurf: windsurfIcon,
+  cursor: cursorIcon,
+  vscode: vscodeIcon,
+  openai: openAiIcon,
+  github: githubIcon,
+  terminal: opencodeIcon,
+  google: googleIcon,
+};
+
+// ==========================================================================
+// Discovery Cache for Performance Optimization
+// ==========================================================================
+
+interface DiscoveryCache {
+  skills: DiscoveredSkill[];
+  timestamp: number;
+}
+
+interface McpConfigStatus {
+  mcpConfigured: boolean;
+  hasOtherMcpServers: boolean;
+}
+
+// Cache TTL in milliseconds (30 seconds)
+const DISCOVERY_CACHE_TTL = 30_000;
+
+/**
+ * Unified Client App Service
+ *
+ * Merges McpAppsManagerService + AgentPath functionality into a single service.
+ * Manages both MCP configuration and skills symlinks for AI clients.
+ */
+export class ClientAppService extends SingletonService<
+  ClientApp,
+  string,
+  ClientAppService
+> {
+  private skillsFileManager: SkillsFileManager;
+  private discoveryCache: DiscoveryCache | null = null;
+  private mcpConfigCache: Map<
+    string,
+    { status: McpConfigStatus; timestamp: number }
+  > = new Map();
+
+  protected constructor() {
+    super();
+    this.skillsFileManager = new SkillsFileManager();
+  }
+
+  /**
+   * Invalidate the discovery cache (call when skills change)
+   */
+  public invalidateDiscoveryCache(): void {
+    this.discoveryCache = null;
+  }
+
+  /**
+   * Invalidate MCP config cache for a specific path or all
+   */
+  public invalidateMcpConfigCache(configPath?: string): void {
+    if (configPath) {
+      this.mcpConfigCache.delete(configPath);
+    } else {
+      this.mcpConfigCache.clear();
+    }
+  }
+
+  protected getEntityName(): string {
+    return "ClientApp";
+  }
+
+  public static getInstance(): ClientAppService {
+    return (this as any).getInstanceBase();
+  }
+
+  public static resetInstance(): void {
+    this.resetInstanceBase(ClientAppService);
+  }
+
+  // ==========================================================================
+  // Core CRUD Methods
+  // ==========================================================================
+
+  /**
+   * List all client apps (standard + custom) with detection status
+   */
+  public async list(): Promise<ClientApp[]> {
+    try {
+      // Get standard clients with their detection status
+      const standardClients = await this.getStandardClients();
+
+      // Get standard client names for deduplication (case-insensitive)
+      const standardClientNames = new Set(
+        STANDARD_CLIENTS.map((c) => c.name.toLowerCase()),
+      );
+      const standardClientIds = new Set(STANDARD_CLIENTS.map((c) => c.id));
+
+      // Get custom clients from repository, filtering out duplicates of standard clients
+      const repo = ClientAppRepository.getInstance();
+      const customClients = repo
+        .getAll({ orderBy: "name" })
+        .filter(
+          (client) =>
+            client.isCustom &&
+            !standardClientNames.has(client.name.toLowerCase()) &&
+            !standardClientIds.has(client.id),
+        );
+
+      // Combine and return
+      return [...standardClients, ...customClients];
+    } catch (error) {
+      return this.handleError("list", error, []);
+    }
+  }
+
+  /**
+   * Get a single client app by ID
+   */
+  public async get(id: string): Promise<ClientApp | null> {
+    try {
+      // Check if it's a standard client
+      const standardDef = STANDARD_CLIENTS.find((c) => c.id === id);
+      if (standardDef) {
+        return this.buildClientAppFromDefinition(standardDef);
+      }
+
+      // Check custom clients
+      const repo = ClientAppRepository.getInstance();
+      const client = repo.getById(id);
+      return client || null;
+    } catch (error) {
+      return this.handleError("get", error, null);
+    }
+  }
+
+  /**
+   * Create a custom client app
+   */
+  public async create(input: CreateClientAppInput): Promise<ClientAppResult> {
+    try {
+      // Validate name
+      if (!input.name || input.name.trim() === "") {
+        return {
+          success: false,
+          message: "Client name cannot be empty",
+        };
+      }
+
+      const name = input.name.trim();
+
+      // Check for duplicates with standard clients
+      const standardDef = STANDARD_CLIENTS.find(
+        (c) => c.name.toLowerCase() === name.toLowerCase(),
+      );
+      if (standardDef) {
+        return {
+          success: false,
+          message: `A standard client with the name "${name}" already exists`,
+        };
+      }
+
+      // Check for duplicates with custom clients
+      const repo = ClientAppRepository.getInstance();
+      const existing = repo.findByName(name);
+      if (existing) {
+        return {
+          success: false,
+          message: `A client with the name "${name}" already exists`,
+        };
+      }
+
+      // Generate server access (all servers enabled by default)
+      const serverAccess = this.generateDefaultServerAccess();
+
+      const now = Date.now();
+      const clientApp = repo.add({
+        name,
+        icon: input.icon,
+        installed: true, // Custom clients are always "installed"
+        mcpConfigPath: input.mcpConfigPath || "",
+        mcpConfigured: false,
+        hasOtherMcpServers: false,
+        skillsPath: input.skillsPath || "",
+        skillsConfigured: false,
+        serverAccess,
+        isStandard: false,
+        isCustom: true,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      // Create symlinks for all existing skills if skillsPath is provided
+      if (clientApp.skillsPath) {
+        await this.createSymlinksForClient(clientApp);
+      }
+
+      return {
+        success: true,
+        message: `Successfully created client "${name}"`,
+        clientApp,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: `Failed to create client: ${error.message}`,
+      };
+    }
+  }
+
+  /**
+   * Update a client app
+   */
+  public async update(
+    id: string,
+    input: UpdateClientAppInput,
+  ): Promise<ClientAppResult> {
+    try {
+      const repo = ClientAppRepository.getInstance();
+      const existing = repo.getById(id);
+
+      if (!existing) {
+        // Check if it's a standard client
+        const standardDef = STANDARD_CLIENTS.find((c) => c.id === id);
+        if (standardDef) {
+          return {
+            success: false,
+            message: "Standard clients cannot be modified directly",
+          };
+        }
+
+        return {
+          success: false,
+          message: "Client not found",
+        };
+      }
+
+      // Handle name change validation
+      if (input.name && input.name !== existing.name) {
+        const duplicate = repo.findByName(input.name);
+        if (duplicate && duplicate.id !== id) {
+          return {
+            success: false,
+            message: `A client with the name "${input.name}" already exists`,
+          };
+        }
+      }
+
+      // Handle skillsPath change
+      const oldSkillsPath = existing.skillsPath;
+      const newSkillsPath = input.skillsPath ?? existing.skillsPath;
+
+      if (oldSkillsPath !== newSkillsPath) {
+        // Remove old symlinks
+        if (oldSkillsPath) {
+          await this.removeSymlinksForClient(existing);
+        }
+      }
+
+      // Update the client
+      const updated = repo.update(id, {
+        ...input,
+        updatedAt: Date.now(),
+      });
+
+      if (!updated) {
+        return {
+          success: false,
+          message: "Failed to update client",
+        };
+      }
+
+      // Create new symlinks if skillsPath changed
+      if (oldSkillsPath !== newSkillsPath && newSkillsPath) {
+        await this.createSymlinksForClient(updated);
+      }
+
+      return {
+        success: true,
+        message: `Successfully updated client "${updated.name}"`,
+        clientApp: updated,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: `Failed to update client: ${error.message}`,
+      };
+    }
+  }
+
+  /**
+   * Delete a custom client app
+   */
+  public async delete(id: string): Promise<ClientAppResult> {
+    try {
+      const repo = ClientAppRepository.getInstance();
+      const existing = repo.getById(id);
+
+      if (!existing) {
+        return {
+          success: false,
+          message: "Client not found",
+        };
+      }
+
+      if (existing.isStandard) {
+        return {
+          success: false,
+          message: "Standard clients cannot be deleted",
+        };
+      }
+
+      // Remove all symlinks for this client
+      if (existing.skillsPath) {
+        await this.removeSymlinksForClient(existing);
+      }
+
+      // Delete from repository
+      const deleted = repo.delete(id);
+
+      if (!deleted) {
+        return {
+          success: false,
+          message: "Failed to delete client",
+        };
+      }
+
+      return {
+        success: true,
+        message: `Successfully deleted client "${existing.name}"`,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: `Failed to delete client: ${error.message}`,
+      };
+    }
+  }
+
+  // ==========================================================================
+  // Detection Methods
+  // ==========================================================================
+
+  /**
+   * Run auto-detection for all clients
+   */
+  public async detectInstalled(): Promise<ClientDetectionResult[]> {
+    try {
+      return detectAllClients();
+    } catch (error) {
+      return this.handleError("detectInstalled", error, []);
+    }
+  }
+
+  // ==========================================================================
+  // MCP Configuration Methods
+  // ==========================================================================
+
+  /**
+   * Set up MCP config file for a client
+   */
+  public async configureClient(id: string): Promise<ClientAppResult> {
+    try {
+      const client = await this.get(id);
+
+      if (!client) {
+        return {
+          success: false,
+          message: "Client not found",
+        };
+      }
+
+      if (!client.mcpConfigPath) {
+        return {
+          success: false,
+          message: "Client has no MCP config path configured",
+        };
+      }
+
+      // Generate token for this client
+      const token = await this.generateClientToken(client);
+
+      // Write MCP configuration
+      await this.writeMcpConfig(client, token);
+
+      // Update client status
+      const repo = ClientAppRepository.getInstance();
+      if (client.isCustom) {
+        repo.update(id, {
+          mcpConfigured: true,
+          token,
+          updatedAt: Date.now(),
+        });
+      }
+
+      const updatedClient = await this.get(id);
+
+      return {
+        success: true,
+        message: `Successfully configured MCP for "${client.name}"`,
+        clientApp: updatedClient || undefined,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: `Failed to configure client: ${error.message}`,
+      };
+    }
+  }
+
+  /**
+   * Update server access permissions for a client
+   */
+  public async updateServerAccess(
+    id: string,
+    serverAccess: TokenServerAccess,
+  ): Promise<ClientAppResult> {
+    try {
+      const client = await this.get(id);
+
+      if (!client) {
+        return {
+          success: false,
+          message: "Client not found",
+        };
+      }
+
+      const repo = ClientAppRepository.getInstance();
+
+      if (client.isCustom) {
+        const updated = repo.update(id, {
+          serverAccess,
+          updatedAt: Date.now(),
+        });
+
+        if (!updated) {
+          return {
+            success: false,
+            message: "Failed to update server access",
+          };
+        }
+
+        return {
+          success: true,
+          message: `Successfully updated server access for "${client.name}"`,
+          clientApp: updated,
+        };
+      }
+
+      // For standard clients, we need to update through token manager
+      // TODO: Implement token-based server access update for standard clients
+      return {
+        success: false,
+        message:
+          "Server access update for standard clients not yet implemented",
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: `Failed to update server access: ${error.message}`,
+      };
+    }
+  }
+
+  // ==========================================================================
+  // Skills Symlink Methods
+  // ==========================================================================
+
+  /**
+   * Recreate skill symlinks for a specific client
+   */
+  public async refreshSymlinks(id: string): Promise<ClientAppResult> {
+    try {
+      const client = await this.get(id);
+
+      if (!client) {
+        return {
+          success: false,
+          message: "Client not found",
+        };
+      }
+
+      if (!client.skillsPath) {
+        return {
+          success: false,
+          message: "Client has no skills path configured",
+        };
+      }
+
+      // Remove existing symlinks
+      await this.removeSymlinksForClient(client);
+
+      // Create new symlinks
+      await this.createSymlinksForClient(client);
+
+      // Update client status
+      const repo = ClientAppRepository.getInstance();
+      if (client.isCustom) {
+        repo.update(id, {
+          skillsConfigured: true,
+          updatedAt: Date.now(),
+        });
+      }
+
+      const updatedClient = await this.get(id);
+
+      return {
+        success: true,
+        message: `Successfully refreshed symlinks for "${client.name}"`,
+        clientApp: updatedClient || undefined,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: `Failed to refresh symlinks: ${error.message}`,
+      };
+    }
+  }
+
+  /**
+   * Create symlinks for all enabled skills to a client's skills path
+   *
+   * Security: Validates that the skills path is in an allowed location
+   * before creating any symlinks.
+   */
+  private async createSymlinksForClient(client: ClientApp): Promise<void> {
+    if (!client.skillsPath) {
+      return;
+    }
+
+    // SECURITY: Validate the client's skills path before creating symlinks
+    const expandedPath = expandHomePath(client.skillsPath);
+    const validation = validateSkillSymlinkTarget(expandedPath);
+    if (!validation.valid) {
+      console.warn(
+        `Security: Skipping symlink creation for client ${client.name}: ${validation.error}`,
+      );
+      return;
+    }
+
+    const skillRepo = SkillRepository.getInstance();
+    const skills = skillRepo.getAll();
+
+    for (const skill of skills) {
+      if (skill.enabled) {
+        const skillPath = this.skillsFileManager.getSkillPath(skill.name);
+        const targetPath = getSymlinkTargetPath(client.skillsPath, skill.name);
+        this.skillsFileManager.createSymlink(skillPath, targetPath);
+      }
+    }
+  }
+
+  /**
+   * Remove all skill symlinks from a client's skills path
+   */
+  private async removeSymlinksForClient(client: ClientApp): Promise<void> {
+    if (!client.skillsPath) {
+      return;
+    }
+
+    const skillRepo = SkillRepository.getInstance();
+    const skills = skillRepo.getAll();
+
+    for (const skill of skills) {
+      const targetPath = getSymlinkTargetPath(client.skillsPath, skill.name);
+      this.skillsFileManager.removeSymlink(targetPath);
+    }
+  }
+
+  /**
+   * Create symlinks for a specific skill to all clients with skills paths
+   * Called when a new skill is created or enabled
+   *
+   * Security: Validates each client's skills path before creating symlinks.
+   */
+  public async createSymlinksForSkill(skillName: string): Promise<void> {
+    try {
+      const clients = await this.list();
+      const skillPath = this.skillsFileManager.getSkillPath(skillName);
+
+      for (const client of clients) {
+        if (client.skillsPath) {
+          // SECURITY: Validate the client's skills path
+          const expandedPath = expandHomePath(client.skillsPath);
+          const validation = validateSkillSymlinkTarget(expandedPath);
+          if (!validation.valid) {
+            console.warn(
+              `Security: Skipping symlink creation for client ${client.name}: ${validation.error}`,
+            );
+            continue;
+          }
+
+          const targetPath = getSymlinkTargetPath(client.skillsPath, skillName);
+          this.skillsFileManager.createSymlink(skillPath, targetPath);
+        }
+      }
+    } catch (error) {
+      this.handleError("createSymlinksForSkill", error);
+    }
+  }
+
+  /**
+   * Remove symlinks for a specific skill from all clients
+   * Called when a skill is deleted or disabled
+   */
+  public async removeSymlinksForSkill(skillName: string): Promise<void> {
+    try {
+      const clients = await this.list();
+
+      for (const client of clients) {
+        if (client.skillsPath) {
+          const targetPath = getSymlinkTargetPath(client.skillsPath, skillName);
+          this.skillsFileManager.removeSymlink(targetPath);
+        }
+      }
+    } catch (error) {
+      this.handleError("removeSymlinksForSkill", error);
+    }
+  }
+
+  /**
+   * Discover skills from all standard clients' skills paths
+   * Scans each client's skills directory for skill folders
+   *
+   * Performance optimizations:
+   * - Uses TTL-based caching (30 seconds) to avoid repeated scans
+   * - Parallelizes scanning across all clients using Promise.all
+   * - Batches file system operations within each client scan
+   *
+   * @param forceRefresh If true, bypasses the cache and performs a fresh scan
+   * @returns Array of discovered skills with metadata
+   */
+  public async discoverSkillsFromClients(
+    forceRefresh = false,
+  ): Promise<DiscoveredSkill[]> {
+    // Check cache first (unless force refresh requested)
+    if (!forceRefresh && this.discoveryCache) {
+      const cacheAge = Date.now() - this.discoveryCache.timestamp;
+      if (cacheAge < DISCOVERY_CACHE_TTL) {
+        return this.discoveryCache.skills;
+      }
+    }
+
+    const platform = process.platform as "darwin" | "win32" | "linux";
+
+    // Filter clients that have skills paths for this platform
+    const clientsWithSkillsPaths = STANDARD_CLIENTS.filter(
+      (client) => client.skillsPath[platform],
+    );
+
+    // Scan all clients in parallel
+    const clientResults = await Promise.all(
+      clientsWithSkillsPaths.map((client) =>
+        this.scanClientSkills(client, platform),
+      ),
+    );
+
+    // Flatten results from all clients
+    const discoveredSkills = clientResults.flat();
+
+    // Update cache
+    this.discoveryCache = {
+      skills: discoveredSkills,
+      timestamp: Date.now(),
+    };
+
+    return discoveredSkills;
+  }
+
+  /**
+   * Scan skills for a single client (helper for parallel execution)
+   */
+  private async scanClientSkills(
+    client: StandardClientDefinition,
+    platform: "darwin" | "win32" | "linux",
+  ): Promise<DiscoveredSkill[]> {
+    const skillsPath = client.skillsPath[platform];
+    if (!skillsPath) {
+      return [];
+    }
+
+    try {
+      // Expand ~ to home directory if present
+      const expandedPath = expandHomePath(skillsPath);
+
+      // Handle glob patterns in the path (e.g., for Claude Desktop's nested UUID paths)
+      let pathsToScan: string[];
+      if (expandedPath.includes("*")) {
+        pathsToScan = resolveGlobPath(expandedPath);
+        if (pathsToScan.length === 0) {
+          return [];
+        }
+      } else {
+        pathsToScan = [expandedPath];
+      }
+
+      // Scan all paths in parallel
+      const pathResults = await Promise.all(
+        pathsToScan.map((pathToScan) =>
+          this.scanSkillsDirectory(pathToScan, client),
+        ),
+      );
+
+      return pathResults.flat();
+    } catch (error) {
+      // Log error but continue with other clients
+      console.error(`Failed to scan skills for client ${client.name}:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Scan a single skills directory (helper for parallel execution)
+   *
+   * Security: Validates that the scan path is within user's home directory
+   * to prevent scanning sensitive system directories.
+   */
+  private async scanSkillsDirectory(
+    pathToScan: string,
+    client: StandardClientDefinition,
+  ): Promise<DiscoveredSkill[]> {
+    // SECURITY: Validate path is within user's home directory
+    const homeDir = os.homedir();
+    if (!isPathContained(homeDir, pathToScan)) {
+      console.warn(
+        `Security: Skipping scan of path outside home directory: ${pathToScan}`,
+      );
+      return [];
+    }
+
+    // SECURITY: Ensure path is not a forbidden system path
+    if (!isPathAllowed(pathToScan)) {
+      console.warn(
+        `Security: Skipping scan of forbidden system path: ${pathToScan}`,
+      );
+      return [];
+    }
+
+    // Check if directory exists
+    const exists = await this.fileExists(pathToScan);
+    if (!exists) {
+      return [];
+    }
+
+    // Read directory entries
+    const entries = await fsPromises.readdir(pathToScan, {
+      withFileTypes: true,
+    });
+
+    // Filter valid entries (non-hidden directories and symlinks)
+    const validEntries = entries.filter(
+      (entry) =>
+        !entry.name.startsWith(".") &&
+        (entry.isDirectory() || entry.isSymbolicLink()),
+    );
+
+    // Process all entries in parallel
+    const skillPromises = validEntries.map(async (entry) => {
+      const skillFolderPath = path.join(pathToScan, entry.name);
+      const isSymlink = entry.isSymbolicLink();
+
+      // Batch the two async operations (symlink read and SKILL.md check)
+      const [symlinkTarget, hasSkillMd] = await Promise.all([
+        isSymlink
+          ? fsPromises.readlink(skillFolderPath).catch(() => undefined)
+          : Promise.resolve(undefined),
+        fsPromises
+          .access(path.join(skillFolderPath, "SKILL.md"))
+          .then(() => true)
+          .catch(() => false),
+      ]);
+
+      return {
+        skillName: entry.name,
+        skillPath: skillFolderPath,
+        sourceClientId: client.id,
+        sourceClientName: client.name,
+        hasSkillMd,
+        isSymlink,
+        symlinkTarget,
+      } as DiscoveredSkill;
+    });
+
+    return Promise.all(skillPromises);
+  }
+
+  // ==========================================================================
+  // Private Helper Methods
+  // ==========================================================================
+
+  /**
+   * Get standard clients with their current detection/configuration status
+   *
+   * Performance optimization: Builds all clients in parallel using Promise.all
+   */
+  private async getStandardClients(): Promise<ClientApp[]> {
+    // Build all clients in parallel
+    const clientPromises = STANDARD_CLIENTS.map((def) =>
+      this.buildClientAppFromDefinition(def),
+    );
+
+    const results = await Promise.all(clientPromises);
+
+    // Filter out null results
+    return results.filter((client): client is ClientApp => client !== null);
+  }
+
+  /**
+   * Build a ClientApp from a standard definition with current status
+   *
+   * Performance optimization: Uses combined MCP config check to read file once
+   * and runs MCP config check + skills config check in parallel
+   */
+  private async buildClientAppFromDefinition(
+    def: StandardClientDefinition,
+  ): Promise<ClientApp | null> {
+    try {
+      const platform = process.platform as "darwin" | "win32" | "linux";
+
+      const mcpConfigPath = def.mcpConfigPath[platform] || "";
+      const skillsPath = def.skillsPath[platform] || "";
+
+      // Detect installation status (synchronous)
+      const detection = detectClient(def.id);
+      const installed = detection?.installed ?? false;
+
+      // Run MCP config check and skills config check in parallel
+      // getMcpConfigStatus reads file once and returns both values
+      const [mcpConfigStatus, skillsConfigured] = await Promise.all([
+        this.getMcpConfigStatus(mcpConfigPath),
+        this.checkSkillsConfigured(skillsPath),
+      ]);
+
+      // Get server access from token (if configured)
+      const serverAccess = this.generateDefaultServerAccess();
+
+      const now = Date.now();
+
+      // Convert icon key to SVG using ICON_MAP
+      const iconSvg = def.icon ? ICON_MAP[def.icon] : undefined;
+
+      return {
+        id: def.id,
+        name: def.name,
+        icon: iconSvg,
+        installed,
+        mcpConfigPath,
+        mcpConfigured: mcpConfigStatus.mcpConfigured,
+        hasOtherMcpServers: mcpConfigStatus.hasOtherMcpServers,
+        skillsPath,
+        skillsConfigured,
+        serverAccess,
+        isStandard: true,
+        isCustom: false,
+        createdAt: now,
+        updatedAt: now,
+      };
+    } catch (error) {
+      console.error(`Failed to build client app for ${def.name}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Generate default server access (all servers enabled)
+   */
+  private generateDefaultServerAccess(): TokenServerAccess {
+    const serverService = getServerService();
+    const servers = serverService.getAllServers();
+    const serverAccess: TokenServerAccess = {};
+
+    for (const server of servers) {
+      serverAccess[server.id] = true;
+    }
+
+    return serverAccess;
+  }
+
+  /**
+   * Get MCP configuration status (combined check)
+   *
+   * Performance optimization: Reads the config file once and returns both
+   * mcpConfigured and hasOtherMcpServers values. Uses caching with TTL.
+   *
+   * Handles multiple config formats:
+   * - JSON with mcpServers.mcp-router or mcpServers.router
+   * - JSON with servers.mcp-router or servers.router
+   * - JSON with mcp.router (OpenCode format)
+   * - TOML with [mcp_servers.mcp_router] (Codex format)
+   */
+  private async getMcpConfigStatus(
+    configPath: string,
+  ): Promise<McpConfigStatus> {
+    const defaultStatus: McpConfigStatus = {
+      mcpConfigured: false,
+      hasOtherMcpServers: false,
+    };
+
+    if (!configPath) {
+      return defaultStatus;
+    }
+
+    // Check cache first
+    const cached = this.mcpConfigCache.get(configPath);
+    if (cached && Date.now() - cached.timestamp < DISCOVERY_CACHE_TTL) {
+      return cached.status;
+    }
+
+    try {
+      const exists = await this.fileExists(configPath);
+      if (!exists) {
+        return defaultStatus;
+      }
+
+      const content = await fsPromises.readFile(configPath, "utf8");
+      const routerKeys = ["mcp-router", "router", "mcp_router"];
+
+      let status: McpConfigStatus;
+
+      // Handle TOML files (Codex uses config.toml)
+      if (configPath.endsWith(".toml")) {
+        const mcpConfigured =
+          content.includes("[mcp_servers.mcp_router]") ||
+          content.includes("[mcp_servers.router]") ||
+          content.includes("[mcp_servers.mcp-router]");
+
+        let hasOtherMcpServers = false;
+        const mcpServerMatches = content.match(/\[mcp_servers\.(\w+)\]/g);
+        if (mcpServerMatches) {
+          const serverNames = mcpServerMatches.map((m) =>
+            m.replace("[mcp_servers.", "").replace("]", ""),
+          );
+          const otherServers = serverNames.filter(
+            (name) => !routerKeys.includes(name),
+          );
+          hasOtherMcpServers = otherServers.length > 0;
+        }
+
+        status = { mcpConfigured, hasOtherMcpServers };
+      } else {
+        // Parse as JSON for other formats
+        const config = JSON.parse(content);
+        let mcpConfigured = false;
+        let hasOtherMcpServers = false;
+
+        // Check mcpServers format
+        if (config.mcpServers) {
+          mcpConfigured =
+            !!config.mcpServers["mcp-router"] ||
+            !!config.mcpServers["router"] ||
+            !!config.mcpServers["mcp_router"];
+
+          const otherServers = Object.keys(config.mcpServers).filter(
+            (key) => !routerKeys.includes(key),
+          );
+          if (otherServers.length > 0) {
+            hasOtherMcpServers = true;
+          }
+        }
+
+        // Check servers format (VSCode)
+        if (config.servers) {
+          if (
+            config.servers["mcp-router"] ||
+            config.servers["router"] ||
+            config.servers["mcp_router"]
+          ) {
+            mcpConfigured = true;
+          }
+
+          const otherServers = Object.keys(config.servers).filter(
+            (key) => !routerKeys.includes(key),
+          );
+          if (otherServers.length > 0) {
+            hasOtherMcpServers = true;
+          }
+        }
+
+        // Check mcp format (OpenCode)
+        if (config.mcp) {
+          if (
+            config.mcp["mcp-router"] ||
+            config.mcp["router"] ||
+            config.mcp["mcp_router"]
+          ) {
+            mcpConfigured = true;
+          }
+
+          const otherServers = Object.keys(config.mcp).filter(
+            (key) => !routerKeys.includes(key),
+          );
+          if (otherServers.length > 0) {
+            hasOtherMcpServers = true;
+          }
+        }
+
+        status = { mcpConfigured, hasOtherMcpServers };
+      }
+
+      // Update cache
+      this.mcpConfigCache.set(configPath, {
+        status,
+        timestamp: Date.now(),
+      });
+
+      return status;
+    } catch {
+      return defaultStatus;
+    }
+  }
+
+  /**
+   * Check if MCP Router is configured in the config file
+   * @deprecated Use getMcpConfigStatus for better performance
+   * Handles multiple config formats:
+   * - JSON with mcpServers.mcp-router or mcpServers.router
+   * - JSON with servers.mcp-router or servers.router
+   * - JSON with mcp.router (OpenCode format)
+   * - TOML with [mcp_servers.mcp_router] (Codex format)
+   */
+  private async checkMcpConfigured(configPath: string): Promise<boolean> {
+    if (!configPath) {
+      return false;
+    }
+
+    try {
+      const exists = await this.fileExists(configPath);
+      if (!exists) {
+        return false;
+      }
+
+      const content = await fsPromises.readFile(configPath, "utf8");
+
+      // Handle TOML files (Codex uses config.toml)
+      if (configPath.endsWith(".toml")) {
+        // Look for mcp_servers.mcp_router or mcp_servers.router section
+        return (
+          content.includes("[mcp_servers.mcp_router]") ||
+          content.includes("[mcp_servers.router]") ||
+          content.includes("[mcp_servers.mcp-router]")
+        );
+      }
+
+      // Parse as JSON for other formats
+      const config = JSON.parse(content);
+
+      // Check for router in mcpServers (various key names)
+      if (config.mcpServers) {
+        if (
+          config.mcpServers["mcp-router"] ||
+          config.mcpServers["router"] ||
+          config.mcpServers["mcp_router"]
+        ) {
+          return true;
+        }
+      }
+
+      // Check servers (VSCode format)
+      if (config.servers) {
+        if (
+          config.servers["mcp-router"] ||
+          config.servers["router"] ||
+          config.servers["mcp_router"]
+        ) {
+          return true;
+        }
+      }
+
+      // Check mcp.router (OpenCode format)
+      if (config.mcp) {
+        if (
+          config.mcp["mcp-router"] ||
+          config.mcp["router"] ||
+          config.mcp["mcp_router"]
+        ) {
+          return true;
+        }
+      }
+
+      return false;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Check if there are other MCP servers configured (besides MCP Router)
+   * Handles multiple config formats matching checkMcpConfigured
+   */
+  private async checkHasOtherMcpServers(configPath: string): Promise<boolean> {
+    if (!configPath) {
+      return false;
+    }
+
+    // Router key names to filter out
+    const routerKeys = ["mcp-router", "router", "mcp_router"];
+
+    try {
+      const exists = await this.fileExists(configPath);
+      if (!exists) {
+        return false;
+      }
+
+      const content = await fsPromises.readFile(configPath, "utf8");
+
+      // Handle TOML files - check for any mcp_servers sections besides router
+      if (configPath.endsWith(".toml")) {
+        const mcpServerMatches = content.match(/\[mcp_servers\.(\w+)\]/g);
+        if (mcpServerMatches) {
+          const serverNames = mcpServerMatches.map((m) =>
+            m.replace("[mcp_servers.", "").replace("]", ""),
+          );
+          const otherServers = serverNames.filter(
+            (name) => !routerKeys.includes(name),
+          );
+          return otherServers.length > 0;
+        }
+        return false;
+      }
+
+      // Parse as JSON
+      const config = JSON.parse(content);
+
+      // Check mcpServers
+      if (config.mcpServers) {
+        const servers = Object.keys(config.mcpServers).filter(
+          (key) => !routerKeys.includes(key),
+        );
+        if (servers.length > 0) {
+          return true;
+        }
+      }
+
+      // Check servers (VSCode format)
+      if (config.servers) {
+        const servers = Object.keys(config.servers).filter(
+          (key) => !routerKeys.includes(key),
+        );
+        if (servers.length > 0) {
+          return true;
+        }
+      }
+
+      // Check mcp (OpenCode format)
+      if (config.mcp) {
+        const servers = Object.keys(config.mcp).filter(
+          (key) => !routerKeys.includes(key),
+        );
+        if (servers.length > 0) {
+          return true;
+        }
+      }
+
+      return false;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Check if skills directory exists and contains skills
+   * Skills are considered "configured" when:
+   * 1. The skills directory exists (supports glob patterns like * for dynamic paths)
+   * 2. The directory contains at least one skill (symlink or directory with skill content)
+   */
+  private async checkSkillsConfigured(skillsPath: string): Promise<boolean> {
+    if (!skillsPath) {
+      return false;
+    }
+
+    try {
+      // Expand ~ to home directory if present
+      const expandedPath = expandHomePath(skillsPath);
+
+      // Handle glob patterns in the path (e.g., for Claude Desktop's nested UUID paths)
+      let pathsToCheck: string[];
+      if (expandedPath.includes("*")) {
+        pathsToCheck = resolveGlobPath(expandedPath);
+        if (pathsToCheck.length === 0) {
+          return false;
+        }
+      } else {
+        pathsToCheck = [expandedPath];
+      }
+
+      // Check each resolved path for skills
+      for (const pathToCheck of pathsToCheck) {
+        // Check if directory exists
+        const exists = await this.fileExists(pathToCheck);
+        if (!exists) {
+          continue;
+        }
+
+        // Check if directory contains any skills (symlinks or skill directories)
+        const entries = await fsPromises.readdir(pathToCheck, {
+          withFileTypes: true,
+        });
+
+        // Skills can be:
+        // 1. Symlinks to skill directories
+        // 2. Directories containing skill files (SKILL.md, *.skill, etc.)
+        // Exclude hidden files/directories (starting with .)
+        const hasSkills = entries.some(
+          (entry) =>
+            !entry.name.startsWith(".") &&
+            (entry.isSymbolicLink() || entry.isDirectory()),
+        );
+
+        if (hasSkills) {
+          return true;
+        }
+      }
+
+      return false;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Generate a token for a client
+   */
+  private async generateClientToken(_client: ClientApp): Promise<string> {
+    // TODO: Integrate with TokenManager from mcp-apps-manager
+    // For now, return empty string
+    return "";
+  }
+
+  /**
+   * Write MCP configuration to client's config file
+   */
+  private async writeMcpConfig(
+    client: ClientApp,
+    _token: string,
+  ): Promise<void> {
+    if (!client.mcpConfigPath) {
+      throw new Error("Client has no MCP config path");
+    }
+
+    // Ensure directory exists
+    const configDir = path.dirname(client.mcpConfigPath);
+    await fsPromises.mkdir(configDir, { recursive: true });
+
+    // TODO: Implement based on config format (json/toml/env-only)
+    // Reference: mcp-apps-manager.service.ts updateAppConfig method
+  }
+
+  /**
+   * Check if a file exists
+   */
+  private async fileExists(filePath: string): Promise<boolean> {
+    try {
+      await fsPromises.access(filePath);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
+/**
+ * Get the ClientAppService instance
+ */
+export function getClientAppService(): ClientAppService {
+  return ClientAppService.getInstance();
+}

@@ -24,6 +24,7 @@ import FinalCommandDisplay from "./FinalCommandDisplay";
 import ServerDetailsRemote from "./ServerDetailsRemote";
 import ServerDetailsEnvironment from "./ServerDetailsEnvironment";
 import ServerDetailsAutoStart from "./ServerDetailsAutoStart";
+import ServerDetailsDevMode from "./ServerDetailsDevMode";
 
 interface EnvPair {
   key: string;
@@ -61,6 +62,68 @@ interface ServerDetailsGeneralSettingsProps {
   assigning?: boolean;
   onAssignProject?: (value: string) => void;
   onOpenManageProjects?: () => void;
+  // Dev Mode
+  editedDevEnabled: boolean;
+  setEditedDevEnabled: (enabled: boolean) => void;
+  editedWatchPatterns: string;
+  setEditedWatchPatterns: (patterns: string) => void;
+}
+
+/**
+ * Detect if a server is a local development server (not a package-based server)
+ * Returns the detected source directory if it's a local dev server, null otherwise
+ */
+function detectLocalDevServer(
+  command?: string,
+  args?: string[],
+): { isLocalDev: boolean; sourceDir: string | null } {
+  const packageManagers = ["npx", "npm", "yarn", "pnpm", "bunx"];
+  const cmd = command?.trim().toLowerCase() || "";
+
+  // Check if command starts with a package manager
+  if (packageManagers.some((pm) => cmd === pm || cmd.startsWith(`${pm} `))) {
+    return { isLocalDev: false, sourceDir: null };
+  }
+
+  // Check if command or args contain absolute paths (local files)
+  const allParts = [command || "", ...(args || [])];
+  for (const part of allParts) {
+    // Match absolute paths (Unix or Windows style)
+    const pathMatch = part.match(/^(\/[^/\s]+|[A-Za-z]:\\)/);
+    if (pathMatch) {
+      // Extract directory from path
+      const lastSlash = Math.max(part.lastIndexOf("/"), part.lastIndexOf("\\"));
+      if (lastSlash > 0) {
+        return { isLocalDev: true, sourceDir: part.substring(0, lastSlash) };
+      }
+    }
+  }
+
+  // Check for relative paths that suggest local development
+  if (
+    cmd.startsWith("node ") ||
+    cmd.startsWith("python ") ||
+    cmd.startsWith("python3 ") ||
+    cmd.startsWith("ts-node ") ||
+    cmd.startsWith("tsx ")
+  ) {
+    // Look for a file path in args
+    for (const arg of args || []) {
+      if (
+        arg.startsWith("/") ||
+        arg.startsWith("./") ||
+        arg.startsWith("../")
+      ) {
+        const lastSlash = arg.lastIndexOf("/");
+        if (lastSlash > 0) {
+          return { isLocalDev: true, sourceDir: arg.substring(0, lastSlash) };
+        }
+        return { isLocalDev: true, sourceDir: "." };
+      }
+    }
+  }
+
+  return { isLocalDev: false, sourceDir: null };
 }
 
 const ServerDetailsGeneralSettings: React.FC<
@@ -89,12 +152,22 @@ const ServerDetailsGeneralSettings: React.FC<
   assigning = false,
   onAssignProject,
   onOpenManageProjects,
+  editedDevEnabled,
+  setEditedDevEnabled,
+  editedWatchPatterns,
+  setEditedWatchPatterns,
 }) => {
   const { t } = useTranslation();
 
   const projectOptions = React.useMemo(() => {
     return projects.slice().sort((a, b) => a.name.localeCompare(b.name));
   }, [projects]);
+
+  // Detect if this is a local development server
+  const { isLocalDev, sourceDir } = React.useMemo(
+    () => detectLocalDevServer(editedCommand || server.command, editedArgs),
+    [editedCommand, server.command, editedArgs],
+  );
 
   return (
     <div className="space-y-6">
@@ -258,6 +331,18 @@ const ServerDetailsGeneralSettings: React.FC<
         removeEnvPair={removeEnvPair}
         addEnvPair={addEnvPair}
       />
+
+      {/* Developer Options (local development servers only - not package managers) */}
+      {server.serverType === "local" && isLocalDev && (
+        <ServerDetailsDevMode
+          server={server}
+          editedDevEnabled={editedDevEnabled}
+          setEditedDevEnabled={setEditedDevEnabled}
+          editedWatchPatterns={editedWatchPatterns}
+          setEditedWatchPatterns={setEditedWatchPatterns}
+          detectedSourceDir={sourceDir}
+        />
+      )}
 
       {/* Final Command Display */}
       <div className="space-y-3">

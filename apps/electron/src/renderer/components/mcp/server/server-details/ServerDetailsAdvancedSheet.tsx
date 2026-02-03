@@ -49,6 +49,8 @@ const ServerDetailsAdvancedSheet: React.FC<ServerDetailsAdvancedSheetProps> = ({
     editedAutoStart,
     envPairs,
     editedToolPermissions,
+    editedDevEnabled,
+    editedWatchPatterns,
     setIsAdvancedEditing: setIsOpen,
     setEditedName,
     setEditedCommand,
@@ -56,6 +58,8 @@ const ServerDetailsAdvancedSheet: React.FC<ServerDetailsAdvancedSheetProps> = ({
     setEditedAutoStart,
     setIsLoading,
     setEditedToolPermissions,
+    setEditedDevEnabled,
+    setEditedWatchPatterns,
     updateArg,
     removeArg,
     addArg,
@@ -369,6 +373,10 @@ const ServerDetailsAdvancedSheet: React.FC<ServerDetailsAdvancedSheetProps> = ({
       assigning={assigning}
       onAssignProject={onAssignProject ? handleAssignProject : undefined}
       onOpenManageProjects={onOpenManageProjects}
+      editedDevEnabled={editedDevEnabled}
+      setEditedDevEnabled={setEditedDevEnabled}
+      editedWatchPatterns={editedWatchPatterns}
+      setEditedWatchPatterns={setEditedWatchPatterns}
     />
   );
 

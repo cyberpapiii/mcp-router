@@ -119,7 +119,12 @@ export class ServerService extends SingletonService<
         config,
       );
       if (result) {
-        logInfo(`サーバ "${result.name}" が更新されました (ID: ${id})`);
+        try {
+          logInfo(`サーバ "${result.name}" が更新されました (ID: ${id})`);
+        } catch (logError) {
+          // Logger worker may have exited - ignore logging errors
+          console.log(`Server "${result.name}" updated (ID: ${id})`);
+        }
       }
       return result;
     } catch (error) {
@@ -138,7 +143,12 @@ export class ServerService extends SingletonService<
       const result = McpServerManagerRepository.getInstance().deleteServer(id);
 
       if (result && server) {
-        logInfo(`サーバ "${server.name}" が削除されました (ID: ${id})`);
+        try {
+          logInfo(`サーバ "${server.name}" が削除されました (ID: ${id})`);
+        } catch (logError) {
+          // Logger worker may have exited - ignore logging errors
+          console.log(`Server "${server.name}" deleted (ID: ${id})`);
+        }
       }
 
       return result;

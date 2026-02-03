@@ -13,6 +13,8 @@ interface ServerEditingState {
   editedAutoStart: boolean;
   envPairs: { key: string; value: string }[];
   editedToolPermissions: Record<string, boolean>;
+  editedDevEnabled: boolean;
+  editedWatchPatterns: string;
 
   // Actions
   setIsAdvancedEditing: (isEditing: boolean) => void;
@@ -28,6 +30,8 @@ interface ServerEditingState {
       | Record<string, boolean>
       | ((prev: Record<string, boolean>) => Record<string, boolean>),
   ) => void;
+  setEditedDevEnabled: (enabled: boolean) => void;
+  setEditedWatchPatterns: (patterns: string) => void;
 
   // Array manipulation actions
   updateArg: (index: number, value: string) => void;
@@ -47,6 +51,7 @@ interface ServerEditingState {
     autoStart?: boolean;
     env?: Record<string, string | boolean | number>;
     toolPermissions?: Record<string, boolean>;
+    dev?: { enabled?: boolean; watch?: string[] };
   }) => void;
 
   // Reset state
@@ -64,6 +69,8 @@ export const useServerEditingStore = create<ServerEditingState>((set) => ({
   editedAutoStart: false,
   envPairs: [],
   editedToolPermissions: {},
+  editedDevEnabled: false,
+  editedWatchPatterns: "",
 
   // Basic setters
   setIsAdvancedEditing: (isAdvancedEditing) => set({ isAdvancedEditing }),
@@ -81,6 +88,8 @@ export const useServerEditingStore = create<ServerEditingState>((set) => ({
           ? permissions(state.editedToolPermissions)
           : permissions,
     })),
+  setEditedDevEnabled: (editedDevEnabled) => set({ editedDevEnabled }),
+  setEditedWatchPatterns: (editedWatchPatterns) => set({ editedWatchPatterns }),
 
   // Array manipulation
   updateArg: (index, value) =>
@@ -130,6 +139,8 @@ export const useServerEditingStore = create<ServerEditingState>((set) => ({
         value: String(value),
       })),
       editedToolPermissions: { ...(server.toolPermissions || {}) },
+      editedDevEnabled: server.dev?.enabled || false,
+      editedWatchPatterns: server.dev?.watch?.join(", ") || "",
     });
   },
 
@@ -145,5 +156,7 @@ export const useServerEditingStore = create<ServerEditingState>((set) => ({
       editedAutoStart: false,
       envPairs: [],
       editedToolPermissions: {},
+      editedDevEnabled: false,
+      editedWatchPatterns: "",
     }),
 }));

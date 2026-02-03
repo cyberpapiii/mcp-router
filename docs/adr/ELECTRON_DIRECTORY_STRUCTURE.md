@@ -21,9 +21,10 @@ apps/electron/src/
 ├── main/                    # Main process
 │   ├── modules/            # Module layer (business logic)
 │   │   ├── auth/           # Authentication
+│   │   ├── client-apps/    # Unified client app management (MCP + Skills)
 │   │   ├── cloud-sync/     # Cloud synchronization
 │   │   ├── marketplace/    # Marketplace
-│   │   ├── mcp-apps-manager/ # MCP app management
+│   │   ├── mcp-apps-manager/ # MCP app management (legacy, being replaced by client-apps)
 │   │   │   └── (mcp-client, token-manager, etc.)
 │   │   ├── mcp-logger/     # MCP log management
 │   │   ├── mcp-server-manager/ # MCP server management
@@ -49,8 +50,13 @@ apps/electron/src/
 │   │   ├── auth/           # Authentication UI
 │   │   ├── common/         # Common components
 │   │   ├── layout/         # Layout
+│   │   ├── marketplace/    # Marketplace UI
+│   │   │   ├── mcp-servers/ # MCP Server marketplace components
+│   │   │   ├── shared/     # Shared marketplace components
+│   │   │   └── skills/     # Skills marketplace components
 │   │   ├── mcp/            # MCP-related UI
 │   │   ├── setting/        # Settings UI
+│   │   ├── skills/         # Local skills management UI
 │   │   ├── workflow/       # Workflow and hook management UI
 │   │   └── workspace/      # Workspace UI
 │   ├── platform-api/       # Platform API
@@ -159,6 +165,12 @@ src/
 - **Reason for rejection**: Current problems would not be resolved
 
 ## Update History
+- **February 2026**: Added client-apps module and marketplace UI components
+  - Added `client-apps/` module for unified client app management (combines MCP config + Skills paths)
+  - Marked `mcp-apps-manager/` as legacy (being replaced by client-apps)
+  - Added `marketplace/` directory with `mcp-servers/`, `shared/`, and `skills/` subdirectories
+  - Added `shared/` subdirectory for shared marketplace components (MarketplaceSearch, etc.)
+  - Added `skills/` directory for local skills management UI
 - **September 2025**: Reflected migration to module layer
   - Changed domain layer to modules layer
   - Deprecated application layer and integrated its functionality into modules layer

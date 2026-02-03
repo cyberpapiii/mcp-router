@@ -27,8 +27,10 @@ Related features were reorganized into logical domains and structured into main 
 interface PlatformAPI {
   app: AppAPI;             // Application management (including token management)
   auth: AuthAPI;           // Authentication and authorization
+  clientApps: ClientAppsAPI; // Client apps management (AI clients like Claude, Cursor)
   cloudSync: CloudSyncAPI; // Cloud synchronization
   logs: LogAPI;            // Log management
+  marketplace: MarketplaceAPI; // MCP Registry marketplace
   packages: PackageAPI;    // Package management (including system utilities)
   projects: ProjectsAPI;   // Projects management
   servers: ServerAPI;      // MCP server management
@@ -105,6 +107,13 @@ interface PlatformAPI {
 - Sync trigger and management
 - Conflict resolution
 
+#### MarketplaceAPI
+- MCP server search and discovery from official registry
+- Server details and README fetching
+- Skills search and discovery
+- Skills installation from marketplace
+- Cache management
+
 #### ProjectsAPI
 - Project CRUD operations
 - Project configuration management
@@ -114,6 +123,13 @@ interface PlatformAPI {
 - Skills discovery and management
 - Skills installation and removal
 - Skills configuration
+
+#### ClientAppsAPI
+- Client app CRUD operations (list, get, create, update, delete)
+- Client app detection (auto-detect installed AI clients)
+- Client app configuration (configure MCP for clients)
+- Server access control management
+- Folder selection for paths
 
 ## Architecture Characteristics
 

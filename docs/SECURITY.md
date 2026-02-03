@@ -266,3 +266,77 @@ All URL mode elicitation requests are validated:
 - Only HTTPS URLs are allowed
 - Internal hosts and private IPs are blocked
 - Cloud metadata endpoints are blocked
+
+---
+
+## Implemented Mitigations (2026-02-02)
+
+The following security mitigations have been implemented for the Skills Router system:
+
+### Path Security Utility (Addresses #4: Path Traversal)
+
+**File:** `apps/electron/src/main/utils/path-security.ts`
+
+Added comprehensive path validation functions:
+- `isPathContained()` - Validates a path is within an allowed base directory
+- `isPathAllowed()` - Blocks forbidden system directories (/etc, /usr, /bin, etc.)
+- `validateSkillSymlinkTarget()` - Validates symlink targets are in allowed agent directories
+- `validateSkillName()` - Validates skill names prevent path traversal attacks
+- `validateAgentPath()` - Validates agent path inputs for creating symlink targets
+- `validateCopyOperation()` - Validates copy operations stay within boundaries
+
+### Skills File Manager Hardening
+
+**File:** `apps/electron/src/main/modules/skills/skills-file-manager.ts`
+
+Security improvements:
+- All file operations now validate paths are within the skills directory
+- Symlink creation validates both source and target paths
+- Directory deletion checks path containment before `rm -rf`
+- Copy operations skip symlinks to prevent symlink attacks
+- Maximum recursion depth (50) prevents infinite loops from circular symlinks
+- Only symlinks can be removed by `removeSymlink()` (not regular files/directories)
+- `openInFinder()` restricted to skills directory only
+
+### Agent Path Validation (Addresses Symlink Attacks)
+
+**File:** `apps/electron/src/main/modules/skills/skills.service.ts`
+
+The `createAgentPath()` method now validates:
+- Path must be within user's home directory
+- Path must be in an allowed agent directory (.claude, .cursor, .config, etc.)
+- Path must not be a forbidden system directory
+
+### Client App Service Hardening
+
+**File:** `apps/electron/src/main/modules/client-apps/client-app.service.ts`
+
+Security improvements:
+- Skill discovery scanning validates paths are within home directory
+- Symlink creation validates client skills paths before creating links
+- Forbidden system paths are blocked from being scanned
+
+### Glob Path Resolution Security
+
+**File:** `apps/electron/src/main/modules/client-apps/client-detector.ts`
+
+Security improvements:
+- Maximum recursion depth (20) prevents infinite loops
+- Maximum results limit (100) prevents memory exhaustion
+- Hidden directories are skipped unless explicitly matched
+
+### SVG Sanitization (Addresses XSS via dangerouslySetInnerHTML)
+
+**File:** `apps/electron/src/renderer/utils/svg-sanitizer.ts`
+
+Added SVG content sanitization utility to prevent XSS attacks when rendering SVG content via `dangerouslySetInnerHTML`:
+- Removes `<script>` tags and their contents
+- Strips event handler attributes (onclick, onerror, onload, etc.)
+- Blocks dangerous URL schemes (javascript:, data:text/html, data:application)
+- Removes `<foreignObject>` elements that could contain arbitrary HTML
+- Blocks dangerous `<use>` elements with external references
+- Removes CSS expressions that could execute code
+
+**Files Updated:**
+- `apps/electron/src/renderer/components/skills/ClientStatusIcon.tsx` - Now uses `sanitizeSvgWithStyles()` before rendering client icons
+- `apps/electron/src/renderer/components/skills/UnifiedSkillDetailSheet.tsx` - Now uses `sanitizeSvgWithStyles()` before rendering client icons

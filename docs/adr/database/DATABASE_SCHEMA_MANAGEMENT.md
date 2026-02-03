@@ -79,7 +79,9 @@ Some repositories (SettingsRepository, McpAppsManagerRepository) use SharedConfi
 | HookRepository | hook_modules | SQLite | No |
 | WorkflowRepository | workflows | SQLite | No |
 | SkillRepository | skills | SQLite | Yes |
-| AgentPathRepository | agent_paths | SQLite | Yes |
+| AgentPathRepository | agent_paths | SQLite | Yes (deprecated, replaced by ClientAppRepository) |
+| ClientAppRepository | client_apps | SQLite | Yes |
+| ClientSkillStateRepository | client_skill_states | SQLite | Yes |
 | ProjectRepository | projects | SQLite | Yes |
 | SettingsRepository | N/A | SharedConfigManager (file-based) | No |
 | McpAppsManagerRepository | N/A | SharedConfigManager (file-based) | No |
@@ -147,6 +149,14 @@ Create schema definitions by reverse-engineering from the database.
 4. **Documentation generation**: Auto-generate documentation from schema definitions
 
 ## Update History
+- **February 2026**: Added client_skill_states table and ClientSkillStateRepository
+  - New client_skill_states table for per-client skill state tracking
+  - Junction table between skills and client_apps for tracking installation state per client
+  - Migration 20260202_create_client_skill_states_table creates the table with indexes
+- **February 2026**: Added client_apps table and ClientAppRepository
+  - New unified client_apps table for managing MCP client applications
+  - AgentPathRepository marked as deprecated (replaced by ClientAppRepository)
+  - Migration 20260201_create_client_apps_table migrates data from agent_paths
 - **January 2026**: Updated documentation to reflect actual implementation
   - Removed references to non-existent DATABASE_SCHEMA object and schema/tables/ directory
   - Updated to reflect inline CREATE_TABLE_SQL pattern per repository

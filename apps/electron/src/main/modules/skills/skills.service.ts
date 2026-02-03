@@ -4,6 +4,10 @@ import { SkillsFileManager } from "./skills-file-manager";
 import { AgentPathRepository } from "./agent-path.repository";
 import { getSymlinkTargetPath } from "./skills-agent-paths";
 import { dialog } from "electron";
+import {
+  validateAgentPath,
+  validateSkillName,
+} from "@/main/utils/path-security";
 import type {
   Skill,
   SkillWithContent,
@@ -41,9 +45,26 @@ export class SkillService extends SingletonService<
   }
 
   /**
-   * List all skills with their content
+   * List all skills without content (for performance)
+   *
+   * Performance optimization: Returns skills without SKILL.md content.
+   * Use getContent(id) to load content on-demand when needed.
    */
-  list(): SkillWithContent[] {
+  list(): Skill[] {
+    try {
+      const repo = SkillRepository.getInstance();
+      return repo.getAll({ orderBy: "name" });
+    } catch (error) {
+      return this.handleError("list", error, []);
+    }
+  }
+
+  /**
+   * List all skills with their content (legacy method)
+   *
+   * @deprecated Use list() for listing and getContent() for content loading
+   */
+  listWithContent(): SkillWithContent[] {
     try {
       const repo = SkillRepository.getInstance();
       const skills = repo.getAll({ orderBy: "name" });
@@ -55,7 +76,78 @@ export class SkillService extends SingletonService<
         ),
       }));
     } catch (error) {
-      return this.handleError("list", error, []);
+      return this.handleError("listWithContent", error, []);
+    }
+  }
+
+  /**
+   * Get a single skill by ID
+   */
+  get(id: string): Skill | null {
+    try {
+      const repo = SkillRepository.getInstance();
+      return repo.getById(id) || null;
+    } catch (error) {
+      return this.handleError("get", error, null);
+    }
+  }
+
+  /**
+   * Get SKILL.md content for a specific skill (lazy loading)
+   *
+   * Performance optimization: Load content on-demand instead of with list()
+   */
+  getContent(id: string): string | null {
+    try {
+      const repo = SkillRepository.getInstance();
+      const skill = repo.getById(id);
+
+      if (!skill) {
+        return null;
+      }
+
+      const skillPath = this.fileManager.getSkillPath(skill.name);
+      return this.fileManager.readSkillMd(skillPath);
+    } catch (error) {
+      return this.handleError("getContent", error, null);
+    }
+  }
+
+  /**
+   * Get skill with content by ID
+   */
+  getWithContent(id: string): SkillWithContent | null {
+    try {
+      const repo = SkillRepository.getInstance();
+      const skill = repo.getById(id);
+
+      if (!skill) {
+        return null;
+      }
+
+      const skillPath = this.fileManager.getSkillPath(skill.name);
+      const content = this.fileManager.readSkillMd(skillPath);
+
+      return {
+        ...skill,
+        content,
+      };
+    } catch (error) {
+      return this.handleError("getWithContent", error, null);
+    }
+  }
+
+  /**
+   * Get SKILL.md content from a specific path (for discovered skills)
+   *
+   * This allows loading content from skills that are not managed by the router
+   * but were discovered in client directories.
+   */
+  getContentFromPath(skillPath: string): string | null {
+    try {
+      return this.fileManager.readSkillMdFromPath(skillPath);
+    } catch (error) {
+      return this.handleError("getContentFromPath", error, null);
     }
   }
 
@@ -308,11 +400,12 @@ export class SkillService extends SingletonService<
 
   /**
    * Create symlinks for all agent paths from database
+   *
+   * Performance note: Uses cached agent paths to avoid repeated DB queries
    */
   private createSymlinksForAllAgents(skillName: string): void {
     const skillPath = this.fileManager.getSkillPath(skillName);
-    const agentPathRepo = AgentPathRepository.getInstance();
-    const agentPaths = agentPathRepo.getAll();
+    const agentPaths = this.getCachedAgentPaths();
 
     for (const agentPath of agentPaths) {
       const targetPath = getSymlinkTargetPath(agentPath.path, skillName);
@@ -322,10 +415,11 @@ export class SkillService extends SingletonService<
 
   /**
    * Remove symlinks for all agent paths from database
+   *
+   * Performance note: Uses cached agent paths to avoid repeated DB queries
    */
   private removeSymlinksForAllAgents(skillName: string): void {
-    const agentPathRepo = AgentPathRepository.getInstance();
-    const agentPaths = agentPathRepo.getAll();
+    const agentPaths = this.getCachedAgentPaths();
 
     for (const agentPath of agentPaths) {
       const targetPath = getSymlinkTargetPath(agentPath.path, skillName);
@@ -334,20 +428,72 @@ export class SkillService extends SingletonService<
   }
 
   /**
+   * Batch create symlinks for multiple skills
+   *
+   * Performance optimization: Caches agent paths and creates symlinks
+   * for multiple skills in a single operation
+   */
+  batchCreateSymlinks(skillNames: string[]): void {
+    const agentPaths = this.getCachedAgentPaths();
+
+    for (const skillName of skillNames) {
+      const skillPath = this.fileManager.getSkillPath(skillName);
+      for (const agentPath of agentPaths) {
+        const targetPath = getSymlinkTargetPath(agentPath.path, skillName);
+        this.fileManager.createSymlink(skillPath, targetPath);
+      }
+    }
+  }
+
+  /**
+   * Batch remove symlinks for multiple skills
+   *
+   * Performance optimization: Caches agent paths and removes symlinks
+   * for multiple skills in a single operation
+   */
+  batchRemoveSymlinks(skillNames: string[]): void {
+    const agentPaths = this.getCachedAgentPaths();
+
+    for (const skillName of skillNames) {
+      for (const agentPath of agentPaths) {
+        const targetPath = getSymlinkTargetPath(agentPath.path, skillName);
+        this.fileManager.removeSymlink(targetPath);
+      }
+    }
+  }
+
+  /**
+   * Get cached agent paths (cache for duration of operation)
+   */
+  private cachedAgentPaths: AgentPath[] | null = null;
+
+  private getCachedAgentPaths(): AgentPath[] {
+    if (this.cachedAgentPaths === null) {
+      const agentPathRepo = AgentPathRepository.getInstance();
+      this.cachedAgentPaths = agentPathRepo.getAll();
+    }
+    return this.cachedAgentPaths;
+  }
+
+  /**
+   * Invalidate agent paths cache (call when agent paths change)
+   */
+  invalidateAgentPathsCache(): void {
+    this.cachedAgentPaths = null;
+  }
+
+  /**
    * Validate and normalize skill name
+   *
+   * Security: Uses centralized validation to prevent path traversal attacks
    */
   private validateAndNormalizeName(input: string): string {
     const name = (input ?? "").trim();
 
-    if (!name) {
-      throw new Error("Skill name cannot be empty");
-    }
-
-    // Only allow characters valid for directory names
-    if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
-      throw new Error(
-        "Skill name can only contain letters, numbers, underscores, and hyphens",
-      );
+    // Use centralized security validation
+    const validation = validateSkillName(name);
+    if (!validation.valid) {
+      throw new Error(validation.error);
     }
 
     return name;
@@ -371,6 +517,9 @@ export class SkillService extends SingletonService<
 
   /**
    * Create a new agent path
+   *
+   * Security: Validates that the path is in an allowed location to prevent
+   * symlinks being created in sensitive system directories.
    */
   createAgentPath(input: CreateAgentPathInput): AgentPath {
     try {
@@ -386,6 +535,13 @@ export class SkillService extends SingletonService<
         throw new Error("Agent path cannot be empty");
       }
 
+      // SECURITY: Validate agent path is in an allowed location
+      // This prevents symlink attacks to sensitive directories like /etc, /usr, etc.
+      const pathValidation = validateAgentPath(pathValue);
+      if (!pathValidation.valid) {
+        throw new Error(pathValidation.error);
+      }
+
       // Check for duplicate name
       const duplicate = repo.findByName(name);
       if (duplicate) {
@@ -399,6 +555,9 @@ export class SkillService extends SingletonService<
         createdAt: now,
         updatedAt: now,
       } as Omit<AgentPath, "id">);
+
+      // Invalidate cache since we added a new agent path
+      this.invalidateAgentPathsCache();
 
       // Create symlinks for all enabled skills to this new agent path
       const skillRepo = SkillRepository.getInstance();
@@ -442,6 +601,9 @@ export class SkillService extends SingletonService<
       if (!ok) {
         throw new Error("Failed to delete agent path");
       }
+
+      // Invalidate cache since we removed an agent path
+      this.invalidateAgentPathsCache();
     } catch (error) {
       this.handleError("deleteAgentPath", error);
     }

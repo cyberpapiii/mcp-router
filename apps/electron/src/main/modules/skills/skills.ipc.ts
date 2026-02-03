@@ -17,6 +17,29 @@ export function setupSkillHandlers(): void {
     return service.list();
   });
 
+  ipcMain.handle("skill:get", async (_evt, id: string) => {
+    if (!id) throw new Error("Missing skill id");
+    return service.get(id);
+  });
+
+  ipcMain.handle("skill:getContent", async (_evt, id: string) => {
+    if (!id) throw new Error("Missing skill id");
+    return service.getContent(id);
+  });
+
+  ipcMain.handle("skill:getWithContent", async (_evt, id: string) => {
+    if (!id) throw new Error("Missing skill id");
+    return service.getWithContent(id);
+  });
+
+  ipcMain.handle(
+    "skill:getContentFromPath",
+    async (_evt, skillPath: string) => {
+      if (!skillPath) throw new Error("Missing skill path");
+      return service.getContentFromPath(skillPath);
+    },
+  );
+
   ipcMain.handle("skill:create", async (_evt, input: CreateSkillInput) => {
     if (!input || !input.name?.trim()) {
       throw new Error("Invalid skill name");

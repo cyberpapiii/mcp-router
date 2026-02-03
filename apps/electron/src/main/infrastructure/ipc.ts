@@ -11,7 +11,13 @@ import { setupHookHandlers } from "../modules/workflow/hook.ipc";
 import { setupProjectHandlers } from "../modules/projects/projects.ipc";
 import { setupCloudSyncHandlers } from "../modules/cloud-sync/cloud-sync.ipc";
 import { setupSkillHandlers } from "../modules/skills/skills.ipc";
+import {
+  setupUnifiedSkillsHandlers,
+  setUnifiedSkillsService,
+} from "../modules/skills/unified-skills.ipc";
+import { getUnifiedSkillsService } from "../modules/skills/unified-skills.service";
 import { setupMarketplaceHandlers } from "../modules/marketplace/marketplace.ipc";
+import { setupClientAppHandlers } from "../modules/client-apps/client-app.ipc";
 import type { MCPServerManager } from "@/main/modules/mcp-server-manager/mcp-server-manager";
 
 /**
@@ -60,6 +66,13 @@ export function setupIpcHandlers(deps: {
   // Skills関連
   setupSkillHandlers();
 
+  // Unified Skills関連
+  setUnifiedSkillsService(getUnifiedSkillsService());
+  setupUnifiedSkillsHandlers();
+
   // Marketplace関連
   setupMarketplaceHandlers();
+
+  // Client Apps関連
+  setupClientAppHandlers();
 }

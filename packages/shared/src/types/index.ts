@@ -47,6 +47,8 @@ export {
   WorkflowAPI,
   // Skills API
   SkillsAPI,
+  // Client Apps API
+  ClientAppsAPI,
   // Main Platform API
   PlatformAPI,
 } from "./platform-api";
@@ -58,3 +60,4 @@ export * from "./workflow-types";
 export * from "./shared-config";
 export * from "./skill-types";
 export * from "./elicitation-types";
+export * from "./client-app-types";

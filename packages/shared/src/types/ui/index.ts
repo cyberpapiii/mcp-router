@@ -20,6 +20,12 @@ export interface DialogState {
 // Theme types
 export type Theme = "light" | "dark" | "system";
 
+// Error Boundary types
+export type ErrorBoundaryState = {
+  hasError: boolean;
+  error: Error | null;
+};
+
 // Store state interfaces
 export interface ServerState {
   // Server data

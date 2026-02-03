@@ -10,6 +10,8 @@ export * from "./domains/cloud-sync-api";
 export * from "./domains/workspace-api";
 export * from "./domains/workflow-api";
 export * from "./domains/skills-api";
+export * from "./domains/marketplace-api";
+export * from "./domains/client-apps-api";
 
 // Export main platform API interface
 export * from "./platform-api";

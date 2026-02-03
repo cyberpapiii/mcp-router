@@ -9,4 +9,8 @@ export function setupCloudSyncHandlers(): void {
   ipcMain.handle("cloud-sync:set-passphrase", (_event, passphrase: string) =>
     getCloudSyncService().setPassphrase(passphrase),
   );
+  ipcMain.handle("cloud-sync:sync-now", async () => {
+    await getCloudSyncService().syncNow();
+    return getCloudSyncService().getStatus();
+  });
 }

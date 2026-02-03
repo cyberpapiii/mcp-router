@@ -132,7 +132,7 @@ export class CloudSyncService {
     }
   }
 
-  private async syncNow(): Promise<void> {
+  public async syncNow(): Promise<void> {
     const state = this.getSyncState();
     if (!state.enabled) {
       return;

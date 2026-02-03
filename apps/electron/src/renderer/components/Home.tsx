@@ -1024,6 +1024,8 @@ const Home: React.FC = () => {
                 editedBearerToken,
                 editedAutoStart,
                 envPairs,
+                editedDevEnabled,
+                editedWatchPatterns,
               } = useServerEditingStore.getState();
 
               const envObj: Record<string, string> = {};
@@ -1061,7 +1063,16 @@ const Home: React.FC = () => {
                 inputParams: finalInputParams,
               };
 
-              if (advancedSettingsServer.serverType !== "local") {
+              if (advancedSettingsServer.serverType === "local") {
+                // Add dev mode configuration for local servers
+                updatedConfig.dev = {
+                  enabled: editedDevEnabled,
+                  watch: editedWatchPatterns
+                    .split(",")
+                    .map((p) => p.trim())
+                    .filter(Boolean),
+                };
+              } else {
                 updatedConfig.bearerToken = editedBearerToken;
               }
 

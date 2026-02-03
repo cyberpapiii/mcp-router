@@ -7,7 +7,7 @@ import {
   IconDeviceDesktop,
   IconDownload,
   IconWand,
-  IconLink,
+  IconBuildingStore,
 } from "@tabler/icons-react";
 import { useTranslation } from "react-i18next";
 import { useWorkspaceStore } from "@/renderer/stores";
@@ -81,22 +81,45 @@ const SidebarComponent: React.FC = () => {
       </SidebarHeader>
 
       <SidebarContent>
-        <SidebarMenu>
-          {/* MCP Group */}
-          <Collapsible defaultOpen className="group/collapsible-mcp">
-            <SidebarGroup>
-              <SidebarGroupLabel>
-                <CollapsibleTrigger className="flex flex-row items-center w-full">
-                  MCP
-                  <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible-mcp:rotate-180" />
-                </CollapsibleTrigger>
-              </SidebarGroupLabel>
-              <CollapsibleContent>
-                <SidebarGroupContent>
+        {/* Marketplace */}
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  tooltip={t("marketplace.title")}
+                  isActive={location.pathname === "/marketplace"}
+                >
+                  <Link
+                    to="/marketplace"
+                    className="flex items-center gap-3 py-5 px-3 w-full"
+                  >
+                    <IconBuildingStore className="h-6 w-6" />
+                    <span className="text-base">{t("marketplace.title")}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* MCP Group */}
+        <Collapsible defaultOpen className="group/collapsible-mcp">
+          <SidebarGroup>
+            <SidebarGroupLabel>
+              <CollapsibleTrigger className="flex flex-row items-center w-full">
+                MCP
+                <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible-mcp:rotate-180" />
+              </CollapsibleTrigger>
+            </SidebarGroupLabel>
+            <CollapsibleContent>
+              <SidebarGroupContent>
+                <SidebarMenu>
                   <SidebarMenuItem>
                     <SidebarMenuButton
                       asChild
-                      tooltip={t("serverList.title")}
+                      tooltip={t("sidebar.myServers")}
                       isActive={location.pathname === "/servers"}
                     >
                       <Link
@@ -105,24 +128,8 @@ const SidebarComponent: React.FC = () => {
                       >
                         <IconServer className="h-6 w-6" />
                         <span className="text-base">
-                          {t("serverList.title")}
+                          {t("sidebar.myServers")}
                         </span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      asChild
-                      tooltip={t("mcpApps.title")}
-                      isActive={location.pathname === "/clients"}
-                    >
-                      <Link
-                        to="/clients"
-                        className="flex items-center gap-3 py-5 px-3 w-full"
-                      >
-                        <IconDeviceDesktop className="h-6 w-6" />
-                        <span className="text-base">{t("mcpApps.title")}</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -131,7 +138,7 @@ const SidebarComponent: React.FC = () => {
                     <SidebarMenuItem>
                       <SidebarMenuButton
                         asChild
-                        tooltip={t("serverDetails.requestLogs")}
+                        tooltip={t("sidebar.logs")}
                         isActive={location.pathname === "/logs"}
                       >
                         <Link
@@ -139,34 +146,34 @@ const SidebarComponent: React.FC = () => {
                           className="flex items-center gap-3 py-5 px-3 w-full"
                         >
                           <IconActivity className="h-6 w-6" />
-                          <span className="text-base">
-                            {t("serverDetails.requestLogs")}
-                          </span>
+                          <span className="text-base">{t("sidebar.logs")}</span>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   )}
-                </SidebarGroupContent>
-              </CollapsibleContent>
-            </SidebarGroup>
-          </Collapsible>
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </CollapsibleContent>
+          </SidebarGroup>
+        </Collapsible>
 
-          {/* Skills Group */}
-          {!isRemoteWorkspace && (
-            <Collapsible defaultOpen className="group/collapsible-skills">
-              <SidebarGroup>
-                <SidebarGroupLabel>
-                  <CollapsibleTrigger className="flex flex-row items-center w-full">
-                    {t("skills.title")}
-                    <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible-skills:rotate-180" />
-                  </CollapsibleTrigger>
-                </SidebarGroupLabel>
-                <CollapsibleContent>
-                  <SidebarGroupContent>
+        {/* Skills Group */}
+        {!isRemoteWorkspace && (
+          <Collapsible defaultOpen className="group/collapsible-skills">
+            <SidebarGroup>
+              <SidebarGroupLabel>
+                <CollapsibleTrigger className="flex flex-row items-center w-full">
+                  {t("skills.title")}
+                  <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible-skills:rotate-180" />
+                </CollapsibleTrigger>
+              </SidebarGroupLabel>
+              <CollapsibleContent>
+                <SidebarGroupContent>
+                  <SidebarMenu>
                     <SidebarMenuItem>
                       <SidebarMenuButton
                         asChild
-                        tooltip={t("skills.title")}
+                        tooltip={t("sidebar.mySkills")}
                         isActive={location.pathname === "/skills"}
                       >
                         <Link
@@ -174,33 +181,44 @@ const SidebarComponent: React.FC = () => {
                           className="flex items-center gap-3 py-5 px-3 w-full"
                         >
                           <IconWand className="h-6 w-6" />
-                          <span className="text-base">{t("skills.title")}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton
-                        asChild
-                        tooltip={t("skills.agentPaths.title")}
-                        isActive={location.pathname === "/skills/agents"}
-                      >
-                        <Link
-                          to="/skills/agents"
-                          className="flex items-center gap-3 py-5 px-3 w-full"
-                        >
-                          <IconLink className="h-6 w-6" />
                           <span className="text-base">
-                            {t("skills.agentPaths.title")}
+                            {t("sidebar.mySkills")}
                           </span>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
-                  </SidebarGroupContent>
-                </CollapsibleContent>
-              </SidebarGroup>
-            </Collapsible>
-          )}
-        </SidebarMenu>
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </CollapsibleContent>
+            </SidebarGroup>
+          </Collapsible>
+        )}
+
+        {/* Client Apps - Combined MCP App Integrations + Agent Paths */}
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  tooltip={t("sidebar.clientApps")}
+                  isActive={
+                    location.pathname === "/clients" ||
+                    location.pathname === "/skills/agents"
+                  }
+                >
+                  <Link
+                    to="/clients"
+                    className="flex items-center gap-3 py-5 px-3 w-full"
+                  >
+                    <IconDeviceDesktop className="h-6 w-6" />
+                    <span className="text-base">{t("sidebar.clientApps")}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
 
       <SidebarFooter>

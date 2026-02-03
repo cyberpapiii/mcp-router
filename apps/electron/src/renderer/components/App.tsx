@@ -7,7 +7,6 @@ import Home from "./Home";
 import { useTranslation } from "react-i18next";
 import SidebarComponent from "./Sidebar";
 import { SidebarProvider } from "@mcp_router/ui";
-import McpAppsManager from "@/renderer/components/mcp/apps/McpAppsManager";
 import LogViewer from "@/renderer/components/mcp/log/LogViewer";
 import Settings from "./setting/Settings";
 import { useServerStore, useAuthStore, initializeStores } from "../stores";
@@ -17,7 +16,8 @@ import { postHogService } from "../services/posthog-service";
 import WorkspaceManagement from "./workspace/WorkspaceManagement";
 import WorkflowManager from "./workflow/WorkflowManager";
 import SkillsManager from "./skills/SkillsManager";
-import AgentPathManager from "./skills/AgentPathManager";
+import Marketplace from "./marketplace/Marketplace";
+import ClientApps from "./client-apps/ClientApps";
 
 // Main App component
 const App: React.FC = () => {
@@ -156,8 +156,9 @@ const App: React.FC = () => {
               <Route path="/" element={<Navigate to="/servers" replace />} />
               <Route path="/servers" element={<Home />} />
               <Route path="/servers/add" element={<DiscoverWrapper />} />
-              <Route path="/clients" element={<McpAppsManager />} />
+              <Route path="/clients" element={<ClientApps />} />
               <Route path="/logs" element={<LogViewer />} />
+              <Route path="/marketplace" element={<Marketplace />} />
               <Route
                 path="/hooks"
                 element={<Navigate to="/workflows" replace />}
@@ -173,7 +174,6 @@ const App: React.FC = () => {
                 element={<WorkspaceManagement />}
               />
               <Route path="/skills" element={<SkillsManager />} />
-              <Route path="/skills/agents" element={<AgentPathManager />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/servers" />} />

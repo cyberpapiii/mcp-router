@@ -21,6 +21,7 @@ import {
   IconLock,
   IconUser,
 } from "@tabler/icons-react";
+import { Loader2 } from "lucide-react";
 import { electronPlatformAPI as platformAPI } from "../../platform-api/electron-platform-api";
 import { postHogService } from "../../services/posthog-service";
 import type { CloudSyncStatus, AppSettings } from "@mcp_router/shared";
@@ -90,6 +91,7 @@ const Settings: React.FC = () => {
   const [isLoadingCloudSync, setIsLoadingCloudSync] = useState(false);
   const [cloudSyncPassphrase, setCloudSyncPassphrase] = useState("");
   const [isSettingPassphrase, setIsSettingPassphrase] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // Feedback state
   const [feedback, setFeedback] = useState("");
@@ -269,6 +271,25 @@ const Settings: React.FC = () => {
     }
   };
 
+  const handleSyncNow = async () => {
+    setIsSyncing(true);
+    try {
+      await platformAPI.cloudSync.syncNow();
+      const newStatus = await platformAPI.cloudSync.getStatus();
+      setCloudSyncStatus(newStatus);
+      toast.success(
+        t("settings.syncSuccess", {
+          defaultValue: "Sync completed successfully",
+        }),
+      );
+    } catch (error) {
+      console.error("Failed to sync:", error);
+      toast.error(t("settings.syncError", { defaultValue: "Sync failed" }));
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   // Feedback handler
   const handleSubmitFeedback = async () => {
     if (!feedback.trim()) return;
@@ -403,14 +424,32 @@ const Settings: React.FC = () => {
                     </span>
                   ) : (
                     cloudSyncStatus?.hasPassphrase && (
-                      <Switch
-                        checked={cloudSyncStatus?.enabled ?? false}
-                        onCheckedChange={handleCloudSyncToggle}
-                        disabled={
-                          isLoadingCloudSync ||
-                          !cloudSyncStatus?.encryptionAvailable
-                        }
-                      />
+                      <div className="flex items-center gap-2">
+                        {cloudSyncStatus?.enabled && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleSyncNow}
+                            disabled={isSyncing || isLoadingCloudSync}
+                          >
+                            {isSyncing ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              t("settings.syncNow", {
+                                defaultValue: "Sync Now",
+                              })
+                            )}
+                          </Button>
+                        )}
+                        <Switch
+                          checked={cloudSyncStatus?.enabled ?? false}
+                          onCheckedChange={handleCloudSyncToggle}
+                          disabled={
+                            isLoadingCloudSync ||
+                            !cloudSyncStatus?.encryptionAvailable
+                          }
+                        />
+                      </div>
                     )
                   )}
                 </div>

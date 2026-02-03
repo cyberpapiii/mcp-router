@@ -16,6 +16,8 @@ import type {
   Workspace,
   ProjectsAPI,
   SkillsAPI,
+  ClientAppsAPI,
+  ClientApp,
 } from "@mcp_router/shared";
 
 // Electron implementation of the Platform API
@@ -31,6 +33,7 @@ class ElectronPlatformAPI implements PlatformAPI {
   workflows: WorkflowAPI;
   projects: ProjectsAPI;
   skills: SkillsAPI;
+  clientApps: ClientAppsAPI;
 
   constructor() {
     // Initialize auth domain
@@ -141,6 +144,7 @@ class ElectronPlatformAPI implements PlatformAPI {
       setEnabled: (enabled) => window.electronAPI.setCloudSyncEnabled(enabled),
       setPassphrase: (passphrase) =>
         window.electronAPI.setCloudSyncPassphrase(passphrase),
+      syncNow: () => window.electronAPI.syncCloudNow(),
     };
 
     // Initialize logs domain
@@ -225,6 +229,11 @@ class ElectronPlatformAPI implements PlatformAPI {
     // Initialize skills domain
     this.skills = {
       list: () => window.electronAPI.listSkills(),
+      get: (id) => window.electronAPI.getSkill(id),
+      getContent: (id) => window.electronAPI.getSkillContent(id),
+      getContentFromPath: (skillPath) =>
+        window.electronAPI.getSkillContentFromPath(skillPath),
+      getWithContent: (id) => window.electronAPI.getSkillWithContent(id),
       create: (input) => window.electronAPI.createSkill(input),
       update: (id, updates) => window.electronAPI.updateSkill(id, updates),
       delete: (id) => window.electronAPI.deleteSkill(id),
@@ -236,6 +245,48 @@ class ElectronPlatformAPI implements PlatformAPI {
         delete: (id) => window.electronAPI.deleteAgentPath(id),
         selectFolder: () => window.electronAPI.selectAgentPathFolder(),
       },
+      // Unified skills operations
+      unified: {
+        list: () => window.electronAPI.listUnifiedSkills(),
+        get: (id) => window.electronAPI.getUnifiedSkill(id),
+        update: (id, updates) =>
+          window.electronAPI.updateUnifiedSkill(id, updates),
+        enableForClient: (skillId: string, clientId: string) =>
+          window.electronAPI.enableForClient(skillId, clientId),
+        disableForClient: (skillId: string, clientId: string) =>
+          window.electronAPI.disableForClient(skillId, clientId),
+        enableAll: (skillId: string) => window.electronAPI.enableAll(skillId),
+        disableAll: (skillId: string) => window.electronAPI.disableAll(skillId),
+        removeFromClient: (skillId: string, clientId: string) =>
+          window.electronAPI.removeFromClient(skillId, clientId),
+        setClientState: (input) =>
+          window.electronAPI.setClientSkillState(input),
+        adopt: (input) => window.electronAPI.adoptSkill(input),
+        sync: (skillId) => window.electronAPI.syncSkills(skillId),
+        verify: () => window.electronAPI.verifySkills(),
+      },
+    };
+
+    // Initialize clientApps domain
+    this.clientApps = {
+      list: () => window.electronAPI.listClientApps(),
+      get: async (id) => {
+        const clientApps = await window.electronAPI.listClientApps();
+        return clientApps.find((c: ClientApp) => c.id === id) || null;
+      },
+      create: (input) => window.electronAPI.createClientApp(input),
+      update: (id, input) => window.electronAPI.updateClientApp(id, input),
+      delete: (id) => window.electronAPI.deleteClientApp(id),
+      detect: () => window.electronAPI.detectClientApps(),
+      configure: (id) => window.electronAPI.configureClientApp(id),
+      updateServerAccess: (id, serverAccess) =>
+        window.electronAPI.updateClientAppServerAccess(id, serverAccess),
+      selectFolder: async () => {
+        const result = await window.electronAPI.selectClientAppFolder();
+        return result.path;
+      },
+      discoverSkillsFromClients: () =>
+        window.electronAPI.discoverSkillsFromClients(),
     };
   }
 }

@@ -125,6 +125,22 @@ export class MainDatabaseMigration {
       description: "Add dev column to servers table for hot reload config",
       execute: (db) => this.migrateAddDevColumn(db),
     });
+
+    // Unified client_apps table
+    this.migrations.push({
+      id: "20260201_create_client_apps_table",
+      description:
+        "Create unified client_apps table and migrate agent_paths data",
+      execute: (db) => this.migrateCreateClientAppsTable(db),
+    });
+
+    // Client skill states table for per-client skill state tracking
+    this.migrations.push({
+      id: "20260202_create_client_skill_states_table",
+      description:
+        "Create client_skill_states table for per-client skill state tracking",
+      execute: (db) => this.migrateCreateClientSkillStatesTable(db),
+    });
   }
 
   /**
@@ -714,6 +730,131 @@ export class MainDatabaseMigration {
       }
     } catch (error) {
       console.error("Error while adding dev column:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * client_appsテーブルを作成し、agent_pathsからデータを移行するマイグレーション
+   */
+  private migrateCreateClientAppsTable(db: SqliteManager): void {
+    try {
+      // Create the unified client_apps table with all columns expected by ClientAppRepository
+      db.execute(`
+        CREATE TABLE IF NOT EXISTS client_apps (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL UNIQUE,
+          icon TEXT,
+          installed INTEGER NOT NULL DEFAULT 0,
+          mcp_config_path TEXT NOT NULL,
+          mcp_configured INTEGER NOT NULL DEFAULT 0,
+          has_other_mcp_servers INTEGER NOT NULL DEFAULT 0,
+          skills_path TEXT NOT NULL,
+          skills_configured INTEGER NOT NULL DEFAULT 0,
+          server_access TEXT NOT NULL DEFAULT '{}',
+          token TEXT,
+          is_standard INTEGER NOT NULL DEFAULT 0,
+          is_custom INTEGER NOT NULL DEFAULT 0,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        )
+      `);
+      console.log("client_apps table created");
+
+      // Check if agent_paths table exists and migrate data
+      const agentPathsExists = db.get(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name = 'agent_paths'",
+        {},
+      );
+
+      if (agentPathsExists) {
+        // Get all records from agent_paths
+        const agentPaths = db.all<{
+          id: string;
+          name: string;
+          path: string;
+          created_at: number;
+          updated_at: number;
+        }>("SELECT * FROM agent_paths");
+
+        console.log(
+          `Migrating ${agentPaths.length} records from agent_paths to client_apps`,
+        );
+
+        // Migrate each record to client_apps
+        for (const agentPath of agentPaths) {
+          db.execute(
+            `INSERT OR IGNORE INTO client_apps
+             (id, name, icon, installed, mcp_config_path, mcp_configured, has_other_mcp_servers, skills_path, skills_configured, server_access, token, is_standard, is_custom, created_at, updated_at)
+             VALUES (:id, :name, :icon, :installed, :mcpConfigPath, :mcpConfigured, :hasOtherMcpServers, :skillsPath, :skillsConfigured, :serverAccess, :token, :isStandard, :isCustom, :createdAt, :updatedAt)`,
+            {
+              id: agentPath.id,
+              name: agentPath.name,
+              icon: null,
+              installed: 0,
+              mcpConfigPath: "",
+              mcpConfigured: 0,
+              hasOtherMcpServers: 0,
+              skillsPath: agentPath.path,
+              skillsConfigured: 0,
+              serverAccess: "{}",
+              token: null,
+              isStandard: 0,
+              isCustom: 1,
+              createdAt: agentPath.created_at,
+              updatedAt: agentPath.updated_at,
+            },
+          );
+        }
+        console.log("Data migrated from agent_paths to client_apps");
+      } else {
+        console.log(
+          "agent_paths table does not exist, skipping data migration",
+        );
+      }
+    } catch (error) {
+      console.error("Error while creating client_apps table:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * client_skill_statesテーブルを作成するマイグレーション
+   * スキルとクライアント間の状態を追跡するジャンクションテーブル
+   */
+  private migrateCreateClientSkillStatesTable(db: SqliteManager): void {
+    try {
+      // Create the client_skill_states table
+      db.execute(`
+        CREATE TABLE IF NOT EXISTS client_skill_states (
+          id TEXT PRIMARY KEY,
+          skill_id TEXT NOT NULL,
+          client_id TEXT NOT NULL,
+          state TEXT NOT NULL DEFAULT 'not-installed',
+          is_managed INTEGER NOT NULL DEFAULT 0,
+          source_type TEXT,
+          discovered_path TEXT,
+          symlink_status TEXT DEFAULT 'none',
+          last_sync_at INTEGER,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          UNIQUE(skill_id, client_id)
+        )
+      `);
+      console.log("client_skill_states table created");
+
+      // Create indexes for efficient lookups
+      db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_client_skill_states_skill ON client_skill_states(skill_id)",
+      );
+      console.log("idx_client_skill_states_skill index created");
+
+      db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_client_skill_states_client ON client_skill_states(client_id)",
+      );
+      console.log("idx_client_skill_states_client index created");
+    } catch (error) {
+      console.error("Error while creating client_skill_states table:", error);
       throw error;
     }
   }

@@ -1,13 +1,17 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { HookModule } from "@mcp_router/shared";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  Collapsible,
+  CollapsibleTrigger,
+  CollapsibleContent,
+  Textarea,
 } from "@mcp_router/ui";
 import { Button, Input, Label } from "@mcp_router/ui";
-import { Plus, Edit2, Trash2 } from "lucide-react";
+import { Plus, Edit2, Trash2, Play, ChevronDown } from "lucide-react";
 import HookModuleEditor from "./HookModuleEditor";
 import { useHookStore } from "../../stores/hook-store";
 import { usePlatformAPI } from "../../platform-api/hooks/use-platform-api";
@@ -46,6 +50,68 @@ export default function HookModuleManager({
   }, [open, loadModules, platformAPI]);
 
   const cancelEdit = resetForm;
+
+  // Test Hook state
+  const [testContext, setTestContext] = useState<string>(
+    '{\n  "request": {},\n  "response": {}\n}',
+  );
+  const [testResult, setTestResult] = useState<any | null>(null);
+  const [isTestRunning, setIsTestRunning] = useState<boolean>(false);
+  const [testError, setTestError] = useState<string | null>(null);
+  const [isTestOpen, setIsTestOpen] = useState<boolean>(false);
+
+  // Validation state
+  const [isValidating, setIsValidating] = useState<boolean>(false);
+  const [validationResult, setValidationResult] = useState<{
+    valid: boolean;
+    error?: string;
+  } | null>(null);
+
+  const handleValidate = async () => {
+    if (!formData.script) return;
+    setIsValidating(true);
+    setValidationResult(null);
+    try {
+      const result = await platformAPI.workflows.hooks.validate(
+        formData.script,
+      );
+      setValidationResult(result);
+    } catch (error) {
+      setValidationResult({
+        valid: false,
+        error: error instanceof Error ? error.message : "Validation failed",
+      });
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
+  const handleRunTest = async () => {
+    if (!editingModule) return;
+
+    setIsTestRunning(true);
+    setTestResult(null);
+    setTestError(null);
+
+    try {
+      const parsedContext = JSON.parse(testContext);
+      const result = await platformAPI.workflows.hooks.execute(
+        editingModule.id,
+        parsedContext,
+      );
+      setTestResult(result);
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        setTestError(`Invalid JSON: ${error.message}`);
+      } else if (error instanceof Error) {
+        setTestError(error.message);
+      } else {
+        setTestError("An unexpected error occurred");
+      }
+    } finally {
+      setIsTestRunning(false);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -133,12 +199,81 @@ export default function HookModuleManager({
                 <Label>Module Code</Label>
                 <HookModuleEditor
                   value={formData.script || ""}
-                  onChange={(value) =>
-                    setFormData({ ...formData, script: value })
-                  }
+                  onChange={(value) => {
+                    setFormData({ ...formData, script: value });
+                    // Clear validation result when code changes
+                    if (validationResult) setValidationResult(null);
+                  }}
                   height="300px"
+                  onValidate={handleValidate}
+                  isValidating={isValidating}
+                  validationResult={validationResult}
                 />
               </div>
+
+              {/* Test Hook Section - only show when editing an existing module */}
+              {editingModule && (
+                <Collapsible open={isTestOpen} onOpenChange={setIsTestOpen}>
+                  <CollapsibleTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      className="flex w-full items-center justify-between p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
+                    >
+                      <span className="font-medium">Test Hook</span>
+                      <ChevronDown
+                        className={`w-4 h-4 transition-transform duration-200 ${
+                          isTestOpen ? "rotate-180" : ""
+                        }`}
+                      />
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="space-y-3 pt-2">
+                    <div>
+                      <Label htmlFor="testContext">Test Context (JSON)</Label>
+                      <Textarea
+                        id="testContext"
+                        value={testContext}
+                        onChange={(e) => setTestContext(e.target.value)}
+                        placeholder='{"request": {...}, "response": {...}}'
+                        className="font-mono text-sm min-h-[120px]"
+                      />
+                    </div>
+                    <Button
+                      onClick={handleRunTest}
+                      disabled={isTestRunning}
+                      size="sm"
+                      className="gap-2"
+                    >
+                      <Play className="w-4 h-4" />
+                      {isTestRunning ? "Running..." : "Run Test"}
+                    </Button>
+
+                    {/* Test Result Display */}
+                    {testResult !== null && (
+                      <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                        <Label className="text-green-700 dark:text-green-400">
+                          Result:
+                        </Label>
+                        <pre className="mt-1 text-sm font-mono text-green-800 dark:text-green-300 whitespace-pre-wrap overflow-auto max-h-[200px]">
+                          {JSON.stringify(testResult, null, 2)}
+                        </pre>
+                      </div>
+                    )}
+
+                    {/* Test Error Display */}
+                    {testError && (
+                      <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                        <Label className="text-red-700 dark:text-red-400">
+                          Error:
+                        </Label>
+                        <pre className="mt-1 text-sm font-mono text-red-800 dark:text-red-300 whitespace-pre-wrap">
+                          {testError}
+                        </pre>
+                      </div>
+                    )}
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
 
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={cancelEdit}>

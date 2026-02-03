@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import {
   IconChevronRight,
@@ -16,6 +16,9 @@ import {
 } from "@mcp_router/shared";
 import { Card } from "@mcp_router/ui";
 import { cn } from "@/renderer/utils/tailwind-utils";
+import ActivityLogFilterBar, {
+  ActivityLogFilters,
+} from "./ActivityLogFilterBar";
 
 interface ActivityLogProps {
   items: ActivityItem[];
@@ -372,6 +375,38 @@ const ActivityLog: React.FC<ActivityLogProps> = ({
   const [expandedExecIds, setExpandedExecIds] = useState<Set<string>>(
     new Set(),
   );
+  const [filters, setFilters] = useState<ActivityLogFilters>({
+    status: "all",
+    minDuration: null,
+  });
+
+  const filteredItems = useMemo(() => {
+    return items.filter((item) => {
+      // Get the entries to check
+      const entries =
+        item.type === "session"
+          ? [item.session.discovery, ...item.session.executions]
+          : [item.entry];
+
+      // Status filter
+      if (filters.status !== "all") {
+        const hasMatchingStatus = entries.some((e) =>
+          filters.status === "error"
+            ? e.status === "error"
+            : e.status !== "error",
+        );
+        if (!hasMatchingStatus) return false;
+      }
+
+      // Duration filter
+      if (filters.minDuration !== null) {
+        const maxDuration = Math.max(...entries.map((e) => e.duration || 0));
+        if (maxDuration < filters.minDuration) return false;
+      }
+
+      return true;
+    });
+  }, [items, filters]);
 
   const toggleExec = useCallback((id: string) => {
     setExpandedExecIds((prev) => {
@@ -411,8 +446,8 @@ const ActivityLog: React.FC<ActivityLogProps> = ({
 
   // 統計
   const stats = {
-    sessions: items.filter((i) => i.type === "session").length,
-    executions: items.reduce((acc, item) => {
+    sessions: filteredItems.filter((i) => i.type === "session").length,
+    executions: filteredItems.reduce((acc, item) => {
       if (item.type === "session") {
         return acc + item.session.executions.length;
       }
@@ -437,8 +472,10 @@ const ActivityLog: React.FC<ActivityLogProps> = ({
         </div>
       </div>
 
+      <ActivityLogFilterBar filters={filters} onFiltersChange={setFilters} />
+
       <div className="flex-1 overflow-y-auto space-y-2">
-        {items.map((item) => {
+        {filteredItems.map((item) => {
           if (item.type === "session") {
             return (
               <SessionCard

@@ -1,4 +1,10 @@
 {
+  "errorBoundary": {
+    "title": "出现错误",
+    "description": "渲染此组件时发生意外错误。",
+    "details": "错误详情",
+    "tryAgain": "重试"
+  },
   "common": {
     "settings": "设置",
     "language": "语言",
@@ -13,7 +19,10 @@
     "remove": "移除",
     "search": "搜索",
     "update": "更新",
-    "send": "发送"
+    "send": "发送",
+    "refresh": "刷新",
+    "edit": "编辑",
+    "deleting": "删除中..."
   },
   "feedback": {
     "placeholder": "反馈或建议？",
@@ -29,7 +38,54 @@
   "home": {
     "title": "MCP Router"
   },
+  "sidebar": {
+    "myServers": "我的服务器",
+    "mySkills": "我的技能",
+    "logs": "日志",
+    "clientApps": "客户端应用"
+  },
   "logs": {
+    "activity": {
+      "title": "活动",
+      "heatmap": {
+        "title": "活动热力图",
+        "sun": "日",
+        "mon": "一",
+        "tue": "二",
+        "wed": "三",
+        "thu": "四",
+        "fri": "五",
+        "sat": "六",
+        "activities": "个活动",
+        "less": "少",
+        "more": "多"
+      },
+      "wordcloud": {
+        "title": "查询关键词",
+        "empty": "所选日期没有查询",
+        "times": "次",
+        "showing": "显示 {{total}} 个关键词中的 {{count}} 个"
+      },
+      "log": {
+        "title": "活动日志",
+        "empty": "所选日期没有活动",
+        "noContext": "工具搜索",
+        "sessions": "会话",
+        "executions": "执行",
+        "noExecutions": "没有执行的工具",
+        "arguments": "参数",
+        "result": "结果",
+        "error": "错误"
+      },
+      "filters": {
+        "status": "状态",
+        "statusAll": "全部",
+        "statusSuccess": "成功",
+        "statusError": "错误",
+        "minDuration": "最小耗时 (毫秒)",
+        "clearFilters": "清除"
+      }
+    },
     "viewer": {
       "refresh": "刷新数据",
       "dateFormat": {
@@ -87,6 +143,10 @@
     "passphrasePlaceholder": "输入加密密码",
     "enableCloudSync": "启用",
     "lastSynced": "最后同步",
+    "syncNow": "立即同步",
+    "syncing": "同步中...",
+    "syncSuccess": "云同步完成",
+    "syncError": "云同步失败",
     "community": "社区",
     "communityDescription": "加入我们的 Discord 社区获取支持、分享反馈并与其他用户交流。",
     "joinDiscord": "加入 Discord 社区",
@@ -190,7 +250,13 @@
     "manageProjects": "管理项目",
     "delete": "删除服务器",
     "confirmDeleteTitle": "删除服务器",
-    "confirmDeleteDescription": "您确定要删除「{{serverName}}」吗？此操作无法撤消。"
+    "confirmDeleteDescription": "您确定要删除「{{serverName}}」吗？此操作无法撤消。",
+    "developerOptions": "开发者选项",
+    "enableHotReload": "启用热重载",
+    "enableHotReloadDescription": "当监视的文件更改时自动重启服务器",
+    "watchPatterns": "监视模式",
+    "watchPatternsPlaceholder": "src/**/*.ts, lib/**/*.js",
+    "watchPatternsHelp": "用逗号分隔的 glob 模式，用于监视文件"
   },
   "importFromJson": {
     "description": "从 JSON 配置文件导入 MCP 服务器",
@@ -277,6 +343,7 @@
     "noResults": "没有匹配的技能",
     "searchPlaceholder": "搜索技能...",
     "loadError": "技能加载失败",
+    "discoveredLoadError": "发现的技能加载失败",
     "createSuccess": "技能创建成功",
     "createError": "技能创建失败",
     "deleteSuccess": "技能删除成功",
@@ -292,9 +359,174 @@
     "nameHint": "仅使用字母、数字、下划线和连字符",
     "create": "创建",
     "selectToEdit": "选择要编辑的技能",
+    "tabs": {
+      "mySkills": "我的技能",
+      "discovered": "发现的技能"
+    },
+    "discovered": {
+      "empty": "在客户端应用中未发现技能",
+      "skill": "个技能",
+      "skills": "个技能",
+      "hasSkillMd": "此技能包含 SKILL.md 文件",
+      "symlink": "符号链接",
+      "symlinkTarget": "链接到"
+    },
     "newDialog": {
       "title": "创建新技能",
       "description": "输入新技能的名称"
+    },
+    "agentPaths": {
+      "title": "集成",
+      "empty": "尚未配置集成",
+      "loadError": "集成加载失败",
+      "createSuccess": "集成添加成功",
+      "createError": "集成添加失败",
+      "deleteSuccess": "集成删除成功",
+      "deleteError": "集成删除失败",
+      "nameRequired": "名称为必填项",
+      "pathRequired": "路径为必填项",
+      "name": "名称",
+      "namePlaceholder": "输入代理名称",
+      "path": "路径",
+      "pathPlaceholder": "输入技能文件夹路径",
+      "pathHint": "~ 展开为主目录（例如：~/.claude/skills）",
+      "create": "添加",
+      "newDialog": {
+        "title": "添加集成",
+        "description": "添加 AI 代理的技能文件夹以同步您的技能"
+      }
+    },
+    "library": {
+      "title": "技能库",
+      "description": "在所有 AI 客户端之间管理和同步技能",
+      "filterAll": "全部",
+      "viewGrid": "网格",
+      "viewList": "列表"
+    },
+    "card": {
+      "discovered": "已发现",
+      "local": "本地",
+      "noDescription": "暂无描述"
+    },
+    "detail": {
+      "contentEditor": "SKILL.md 内容",
+      "clientInstallation": "客户端安装",
+      "bulkActions": "批量操作",
+      "syncToAll": "同步到所有客户端",
+      "enableAll": "全部启用",
+      "disableAll": "全部禁用",
+      "status": {
+        "enabled": "已启用",
+        "disabled": "已禁用",
+        "notInstalled": "未安装"
+      },
+      "actions": {
+        "enable": "启用",
+        "disable": "禁用",
+        "install": "安装",
+        "remove": "移除"
+      }
+    },
+    "adopt": {
+      "title": "采纳技能",
+      "description": "将此发现的技能导入 MCP Router 管理",
+      "success": "技能采纳成功",
+      "error": "技能采纳失败"
+    },
+    "sync": {
+      "success": "技能已同步到所有客户端",
+      "error": "技能同步失败"
+    }
+  },
+  "hookModule": {
+    "validateSyntax": "验证语法",
+    "validating": "验证中...",
+    "syntaxValid": "语法正确",
+    "syntaxError": "语法错误",
+    "testHook": "测试钩子",
+    "testContext": "测试上下文 (JSON)",
+    "testContextPlaceholder": "{\"request\": {}, \"response\": {}}",
+    "runTest": "运行测试",
+    "testRunning": "运行中...",
+    "testResult": "测试结果",
+    "testError": "测试错误"
+  },
+  "clientApps": {
+    "title": "客户端应用",
+    "description": "配置 AI 助手使用您的 MCP 服务器和技能",
+    "addClient": "添加客户端",
+    "installed": "已安装",
+    "notInstalled": "未安装",
+    "custom": "自定义",
+    "mcpConfigured": "MCP: 已配置",
+    "mcpNotConfigured": "MCP: 未配置",
+    "skillsSynced": "技能: 已同步",
+    "skillsNotSetUp": "技能: 未设置",
+    "skillsLabel": "技能",
+    "serverAccess": "服务器访问",
+    "serverAccessDescription": "选择此客户端可以访问的服务器：",
+    "serverAccessSaved": "服务器访问设置保存成功",
+    "howToUse": "使用方法",
+    "configure": "配置",
+    "edit": "编辑",
+    "delete": "删除",
+    "noClients": "尚未配置客户端应用",
+    "deleted": "客户端删除成功",
+    "addCustomClient": {
+      "title": "添加自定义客户端",
+      "description": "添加具有 MCP 配置和技能路径的自定义 AI 客户端",
+      "name": "名称",
+      "namePlaceholder": "输入客户端名称",
+      "mcpConfigPath": "MCP 配置路径",
+      "mcpConfigPathPlaceholder": "MCP 配置文件路径",
+      "mcpConfigPathHint": "客户端读取 MCP 服务器配置的位置",
+      "skillsPath": "技能路径",
+      "skillsPathPlaceholder": "技能目录路径",
+      "skillsPathHint": "技能同步目标位置（~ 展开为主目录）",
+      "create": "添加客户端"
+    },
+    "editClient": {
+      "title": "编辑客户端",
+      "description": "更新客户端配置"
+    },
+    "deleteConfirm": {
+      "title": "删除客户端",
+      "message": "确定要删除此客户端吗？这将删除所有相关的符号链接。",
+      "confirm": "删除"
+    },
+    "errors": {
+      "loadFailed": "客户端应用加载失败",
+      "nameRequired": "客户端名称为必填项",
+      "createFailed": "客户端创建失败",
+      "updateFailed": "客户端更新失败",
+      "configureFailed": "客户端配置失败",
+      "serverAccessFailed": "服务器访问更新失败",
+      "deleteFailed": "客户端删除失败"
+    }
+  },
+  "marketplace": {
+    "title": "市场",
+    "search": "搜索市场...",
+    "searchPlaceholder": "搜索服务器和技能...",
+    "tabs": {
+      "servers": "MCP 服务器",
+      "skills": "技能"
+    },
+    "servers": {
+      "title": "MCP 服务器",
+      "addToRouter": "添加到路由器",
+      "noResults": "未找到服务器",
+      "loading": "正在加载服务器...",
+      "official": "官方",
+      "verified": "已验证"
+    },
+    "skills": {
+      "title": "技能",
+      "install": "安装",
+      "installed": "已安装",
+      "noResults": "未找到技能",
+      "loading": "正在加载技能...",
+      "installs": "次安装"
     }
   }
 }

@@ -1,4 +1,10 @@
 {
+  "errorBoundary": {
+    "title": "エラーが発生しました",
+    "description": "このコンポーネントのレンダリング中に予期せぬエラーが発生しました。",
+    "details": "エラーの詳細",
+    "tryAgain": "再試行"
+  },
   "home": {
     "title": "MCP Router"
   },
@@ -16,7 +22,10 @@
     "remove": "削除",
     "search": "検索",
     "update": "アップデート",
-    "send": "送信"
+    "send": "送信",
+    "refresh": "更新",
+    "edit": "編集",
+    "deleting": "削除中..."
   },
   "feedback": {
     "placeholder": "フィードバックやご提案などをお聞かせください",
@@ -27,6 +36,12 @@
     "title": "MCP Routerにログイン",
     "description": "この機能にアクセスするためにログインしてください。",
     "loginButton": "ログイン"
+  },
+  "sidebar": {
+    "myServers": "マイサーバー",
+    "mySkills": "マイスキル",
+    "logs": "ログ",
+    "clientApps": "クライアントアプリ"
   },
   "logs": {
     "activity": {
@@ -60,6 +75,14 @@
         "arguments": "引数",
         "result": "結果",
         "error": "エラー"
+      },
+      "filters": {
+        "status": "ステータス",
+        "statusAll": "すべて",
+        "statusSuccess": "成功",
+        "statusError": "エラー",
+        "minDuration": "最小実行時間 (ミリ秒)",
+        "clearFilters": "クリア"
       }
     },
     "viewer": {
@@ -119,6 +142,10 @@
     "passphrasePlaceholder": "暗号化パスフレーズを入力",
     "enableCloudSync": "有効化",
     "lastSynced": "最終同期",
+    "syncNow": "今すぐ同期",
+    "syncing": "同期中...",
+    "syncSuccess": "クラウド同期が完了しました",
+    "syncError": "クラウド同期に失敗しました",
     "community": "コミュニティ",
     "communityDescription": "Discordコミュニティに参加して、サポートを受けたり、フィードバックを共有したり、他のユーザーとつながりましょう。",
     "joinDiscord": "Discordコミュニティに参加",
@@ -222,7 +249,13 @@
     "manageProjects": "プロジェクトを管理",
     "delete": "サーバーを削除",
     "confirmDeleteTitle": "サーバーを削除",
-    "confirmDeleteDescription": "「{{serverName}}」を削除してもよろしいですか？この操作は取り消せません。"
+    "confirmDeleteDescription": "「{{serverName}}」を削除してもよろしいですか？この操作は取り消せません。",
+    "developerOptions": "開発者オプション",
+    "enableHotReload": "ホットリロードを有効にする",
+    "enableHotReloadDescription": "監視対象のファイルが変更されたときにサーバーを自動的に再起動します",
+    "watchPatterns": "監視パターン",
+    "watchPatternsPlaceholder": "src/**/*.ts, lib/**/*.js",
+    "watchPatternsHelp": "監視するファイルのカンマ区切りのglobパターン"
   },
   "locale": "ja-JP",
   "importFromJson": {
@@ -310,6 +343,7 @@
     "noResults": "検索条件に一致するスキルがありません",
     "searchPlaceholder": "スキルを検索...",
     "loadError": "スキルの読み込みに失敗しました",
+    "discoveredLoadError": "検出されたスキルの読み込みに失敗しました",
     "createSuccess": "スキルを作成しました",
     "createError": "スキルの作成に失敗しました",
     "deleteSuccess": "スキルを削除しました",
@@ -325,6 +359,18 @@
     "nameHint": "英数字、アンダースコア、ハイフンのみ使用可能",
     "create": "作成",
     "selectToEdit": "編集するスキルを選択してください",
+    "tabs": {
+      "mySkills": "マイスキル",
+      "discovered": "検出されたスキル"
+    },
+    "discovered": {
+      "empty": "クライアントアプリでスキルが検出されませんでした",
+      "skill": "スキル",
+      "skills": "スキル",
+      "hasSkillMd": "このスキルにはSKILL.mdファイルがあります",
+      "symlink": "シンボリックリンク",
+      "symlinkTarget": "リンク先"
+    },
     "newDialog": {
       "title": "新規スキルを作成",
       "description": "新しいスキルの名前を入力してください"
@@ -349,6 +395,138 @@
         "title": "連携先を追加",
         "description": "スキルのシンボリックリンク先となるフォルダを追加します"
       }
+    },
+    "library": {
+      "title": "スキルライブラリ",
+      "description": "すべてのAIクライアント間でスキルを管理・同期",
+      "filterAll": "すべて",
+      "viewGrid": "グリッド",
+      "viewList": "リスト"
+    },
+    "card": {
+      "discovered": "検出済み",
+      "local": "ローカル",
+      "noDescription": "説明がありません"
+    },
+    "detail": {
+      "contentEditor": "SKILL.md コンテンツ",
+      "clientInstallation": "クライアントへのインストール",
+      "bulkActions": "一括操作",
+      "syncToAll": "すべてのクライアントに同期",
+      "enableAll": "すべて有効化",
+      "disableAll": "すべて無効化",
+      "status": {
+        "enabled": "有効",
+        "disabled": "無効",
+        "notInstalled": "未インストール"
+      },
+      "actions": {
+        "enable": "有効化",
+        "disable": "無効化",
+        "install": "インストール",
+        "remove": "削除"
+      }
+    },
+    "adopt": {
+      "title": "スキルを取り込む",
+      "description": "検出されたスキルをMCP Routerの管理に取り込みます",
+      "success": "スキルを取り込みました",
+      "error": "スキルの取り込みに失敗しました"
+    },
+    "sync": {
+      "success": "すべてのクライアントにスキルを同期しました",
+      "error": "スキルの同期に失敗しました"
+    }
+  },
+  "hookModule": {
+    "validateSyntax": "構文を検証",
+    "validating": "検証中...",
+    "syntaxValid": "構文は正しいです",
+    "syntaxError": "構文エラー",
+    "testHook": "フックをテスト",
+    "testContext": "テストコンテキスト (JSON)",
+    "testContextPlaceholder": "{\"request\": {}, \"response\": {}}",
+    "runTest": "テスト実行",
+    "testRunning": "実行中...",
+    "testResult": "テスト結果",
+    "testError": "テストエラー"
+  },
+  "clientApps": {
+    "title": "クライアントアプリ",
+    "description": "AIアシスタントでMCPサーバーとスキルを使用するための設定",
+    "addClient": "クライアントを追加",
+    "installed": "インストール済み",
+    "notInstalled": "未インストール",
+    "custom": "カスタム",
+    "mcpConfigured": "MCP: 設定済み",
+    "mcpNotConfigured": "MCP: 未設定",
+    "skillsSynced": "スキル: 同期済み",
+    "skillsNotSetUp": "スキル: 未設定",
+    "skillsLabel": "スキル",
+    "serverAccess": "サーバーアクセス",
+    "serverAccessDescription": "このクライアントがアクセスできるサーバーを選択してください：",
+    "serverAccessSaved": "サーバーアクセス設定を保存しました",
+    "howToUse": "使用方法",
+    "configure": "設定",
+    "edit": "編集",
+    "delete": "削除",
+    "noClients": "クライアントアプリがまだ設定されていません",
+    "deleted": "クライアントを削除しました",
+    "addCustomClient": {
+      "title": "カスタムクライアントを追加",
+      "description": "MCP設定とスキルパスを持つカスタムAIクライアントを追加",
+      "name": "名前",
+      "namePlaceholder": "クライアント名を入力",
+      "mcpConfigPath": "MCP設定パス",
+      "mcpConfigPathPlaceholder": "MCP設定ファイルのパス",
+      "mcpConfigPathHint": "クライアントがMCPサーバー設定を読み込む場所",
+      "skillsPath": "スキルパス",
+      "skillsPathPlaceholder": "スキルディレクトリのパス",
+      "skillsPathHint": "スキルを同期する場所（~はホームに展開）",
+      "create": "クライアントを追加"
+    },
+    "editClient": {
+      "title": "クライアントを編集",
+      "description": "クライアント設定を更新"
+    },
+    "deleteConfirm": {
+      "title": "クライアントを削除",
+      "message": "このクライアントを削除してもよろしいですか？関連するすべてのシンボリックリンクが削除されます。",
+      "confirm": "削除"
+    },
+    "errors": {
+      "loadFailed": "クライアントアプリの読み込みに失敗しました",
+      "nameRequired": "クライアント名は必須です",
+      "createFailed": "クライアントの作成に失敗しました",
+      "updateFailed": "クライアントの更新に失敗しました",
+      "configureFailed": "クライアントの設定に失敗しました",
+      "serverAccessFailed": "サーバーアクセスの更新に失敗しました",
+      "deleteFailed": "クライアントの削除に失敗しました"
+    }
+  },
+  "marketplace": {
+    "title": "マーケットプレイス",
+    "search": "マーケットプレイスを検索...",
+    "searchPlaceholder": "サーバーとスキルを検索...",
+    "tabs": {
+      "servers": "MCPサーバー",
+      "skills": "スキル"
+    },
+    "servers": {
+      "title": "MCPサーバー",
+      "addToRouter": "ルーターに追加",
+      "noResults": "サーバーが見つかりません",
+      "loading": "サーバーを読み込み中...",
+      "official": "公式",
+      "verified": "認証済み"
+    },
+    "skills": {
+      "title": "スキル",
+      "install": "インストール",
+      "installed": "インストール済み",
+      "noResults": "スキルが見つかりません",
+      "loading": "スキルを読み込み中...",
+      "installs": "インストール"
     }
   }
 }

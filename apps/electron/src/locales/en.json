@@ -1,4 +1,10 @@
 {
+  "errorBoundary": {
+    "title": "Something went wrong",
+    "description": "An unexpected error occurred while rendering this component.",
+    "details": "Error details",
+    "tryAgain": "Try Again"
+  },
   "common": {
     "settings": "Settings",
     "language": "Language",
@@ -13,7 +19,10 @@
     "remove": "Remove",
     "search": "Search",
     "update": "Update",
-    "send": "Send"
+    "send": "Send",
+    "refresh": "Refresh",
+    "edit": "Edit",
+    "deleting": "Deleting..."
   },
   "feedback": {
     "placeholder": "Feedback or suggestions?",
@@ -28,6 +37,12 @@
   },
   "home": {
     "title": "MCP Router"
+  },
+  "sidebar": {
+    "myServers": "My Servers",
+    "mySkills": "My Skills",
+    "logs": "Logs",
+    "clientApps": "Client Apps"
   },
   "logs": {
     "activity": {
@@ -61,6 +76,14 @@
         "arguments": "Arguments",
         "result": "Result",
         "error": "Error"
+      },
+      "filters": {
+        "status": "Status",
+        "statusAll": "All",
+        "statusSuccess": "Success",
+        "statusError": "Error",
+        "minDuration": "Min Duration (ms)",
+        "clearFilters": "Clear"
       }
     },
     "viewer": {
@@ -120,6 +143,10 @@
     "passphrasePlaceholder": "Enter encryption passphrase",
     "enableCloudSync": "Enable",
     "lastSynced": "Last synced",
+    "syncNow": "Sync Now",
+    "syncing": "Syncing...",
+    "syncSuccess": "Cloud sync completed",
+    "syncError": "Cloud sync failed",
     "community": "Community",
     "communityDescription": "Join our Discord community to get support, share feedback, and connect with other users.",
     "joinDiscord": "Join Discord Community",
@@ -223,7 +250,13 @@
     "manageProjects": "Manage Projects",
     "delete": "Delete Server",
     "confirmDeleteTitle": "Delete Server",
-    "confirmDeleteDescription": "Are you sure you want to delete \"{{serverName}}\"? This action cannot be undone."
+    "confirmDeleteDescription": "Are you sure you want to delete \"{{serverName}}\"? This action cannot be undone.",
+    "developerOptions": "Developer Options",
+    "enableHotReload": "Enable Hot Reload",
+    "enableHotReloadDescription": "Automatically restart the server when watched files change",
+    "watchPatterns": "Watch Patterns",
+    "watchPatternsPlaceholder": "src/**/*.ts, lib/**/*.js",
+    "watchPatternsHelp": "Comma-separated glob patterns for files to watch"
   },
   "importFromJson": {
     "description": "Import MCP servers from a JSON configuration file",
@@ -310,6 +343,7 @@
     "noResults": "No skills match your search",
     "searchPlaceholder": "Search skills...",
     "loadError": "Failed to load skills",
+    "discoveredLoadError": "Failed to load discovered skills",
     "createSuccess": "Skill created successfully",
     "createError": "Failed to create skill",
     "deleteSuccess": "Skill deleted successfully",
@@ -325,6 +359,18 @@
     "nameHint": "Use letters, numbers, underscores, and hyphens only",
     "create": "Create",
     "selectToEdit": "Select a skill to edit",
+    "tabs": {
+      "mySkills": "My Skills",
+      "discovered": "Discovered Skills"
+    },
+    "discovered": {
+      "empty": "No skills discovered in client apps",
+      "skill": "skill",
+      "skills": "skills",
+      "hasSkillMd": "This skill has a SKILL.md file",
+      "symlink": "Symlink",
+      "symlinkTarget": "Points to"
+    },
     "newDialog": {
       "title": "Create New Skill",
       "description": "Enter a name for your new skill"
@@ -349,6 +395,208 @@
         "title": "Add Integration",
         "description": "Add an AI agent's skills folder to sync your skills"
       }
+    },
+    "library": {
+      "title": "Skills Library",
+      "description": "Manage and sync skills across all your AI clients",
+      "filterAll": "All",
+      "viewGrid": "Grid",
+      "viewList": "List"
+    },
+    "card": {
+      "discovered": "Discovered",
+      "local": "Local",
+      "noDescription": "No description available"
+    },
+    "detail": {
+      "contentEditor": "SKILL.md Content",
+      "clientInstallation": "Client Installation",
+      "bulkActions": "Bulk Actions",
+      "syncToAll": "Sync to All Clients",
+      "enableAll": "Enable All",
+      "disableAll": "Disable All",
+      "status": {
+        "enabled": "Enabled",
+        "disabled": "Disabled",
+        "notInstalled": "Not Installed"
+      },
+      "actions": {
+        "enable": "Enable",
+        "disable": "Disable",
+        "install": "Install",
+        "remove": "Remove"
+      }
+    },
+    "adopt": {
+      "title": "Adopt Skill",
+      "description": "Import this discovered skill into MCP Router management",
+      "success": "Skill adopted successfully",
+      "error": "Failed to adopt skill"
+    },
+    "sync": {
+      "success": "Skill synced to all clients",
+      "error": "Failed to sync skill"
+    },
+    "unified": {
+      "title": "Skills Library",
+      "filter": "Filter:",
+      "all": "All",
+      "discovered": "Discovered",
+      "local": "Local",
+      "sheetDescription": "Manage skill content and client installation",
+      "contentLabel": "SKILL.md Content",
+      "contentPlaceholder": "# Skill Name\n\nDescribe your skill here...",
+      "clientInstallations": "Client Installations",
+      "noClients": "No clients configured",
+      "saveError": "Failed to save skill content",
+      "saving": "Saving...",
+      "saved": "Saved",
+      "unsaved": "Unsaved changes",
+      "enabledForClient": "Skill enabled for client",
+      "disabledForClient": "Skill disabled for client",
+      "enableError": "Failed to enable skill",
+      "disableError": "Failed to disable skill",
+      "removedFromClient": "Skill removed from client",
+      "removeError": "Failed to remove skill",
+      "installedToClient": "Skill installed to client",
+      "installError": "Failed to install skill",
+      "syncedToAll": "Skill synced to all clients",
+      "syncError": "Failed to sync skill",
+      "enabledAll": "Skill enabled in all clients",
+      "enableAllError": "Failed to enable skill in all clients",
+      "disabledAll": "Skill disabled in all clients",
+      "disableAllError": "Failed to disable skill in all clients",
+      "deleted": "Skill deleted successfully",
+      "deleteError": "Failed to delete skill",
+      "status": {
+        "enabled": "Enabled",
+        "disabled": "Disabled",
+        "notInstalled": "Not Installed"
+      },
+      "actions": {
+        "enable": "Enable",
+        "disable": "Disable",
+        "install": "Install",
+        "remove": "Remove"
+      },
+      "bulkActions": {
+        "syncToAll": "Sync to All",
+        "enableAll": "Enable All",
+        "disableAll": "Disable All",
+        "delete": "Delete Skill"
+      },
+      "table": {
+        "client": "Client",
+        "status": "Status",
+        "actions": "Actions"
+      },
+      "deleteDialog": {
+        "title": "Delete Skill",
+        "description": "Are you sure you want to delete \"{{name}}\"? This will remove the skill from all clients and cannot be undone."
+      }
+    },
+    "viewDetails": "View details for {{name}}",
+    "enabledInClients": "Enabled in {{count}} of {{total}} clients",
+    "notEnabled": "Not enabled in any client",
+    "managedByRouter": "Managed by MCP Router",
+    "clientStates": "Client Status",
+    "enableForClient": "Enable for {{client}}",
+    "disableForClient": "Disable for {{client}}",
+    "clientStateUpdated": "{{client}}: {{state}}",
+    "clientStateError": "Failed to update client state",
+    "skillMdContent": "SKILL.md Content",
+    "skillMdPlaceholder": "# Skill Name\n\nDescribe your skill here...",
+    "saveError": "Failed to save changes"
+  },
+  "hookModule": {
+    "validateSyntax": "Validate Syntax",
+    "validating": "Validating...",
+    "syntaxValid": "Syntax is valid",
+    "syntaxError": "Syntax error",
+    "testHook": "Test Hook",
+    "testContext": "Test Context (JSON)",
+    "testContextPlaceholder": "{\"request\": {}, \"response\": {}}",
+    "runTest": "Run Test",
+    "testRunning": "Running...",
+    "testResult": "Test Result",
+    "testError": "Test Error"
+  },
+  "clientApps": {
+    "title": "Client Apps",
+    "description": "Configure AI assistants to use your MCP servers and skills",
+    "addClient": "Add Client",
+    "installed": "Installed",
+    "notInstalled": "Not Installed",
+    "custom": "Custom",
+    "mcpConfigured": "MCP: Configured",
+    "mcpNotConfigured": "MCP: Not configured",
+    "skillsSynced": "Skills: Synced",
+    "skillsNotSetUp": "Skills: Not set up",
+    "skillsLabel": "Skills",
+    "serverAccess": "Server Access",
+    "serverAccessDescription": "Select which servers this client can access:",
+    "serverAccessSaved": "Server access settings saved successfully",
+    "howToUse": "How to Use",
+    "configure": "Configure",
+    "edit": "Edit",
+    "delete": "Delete",
+    "noClients": "No client apps configured yet",
+    "deleted": "Client deleted successfully",
+    "addCustomClient": {
+      "title": "Add Custom Client",
+      "description": "Add a custom AI client with its MCP config and skills paths",
+      "name": "Name",
+      "namePlaceholder": "Enter client name",
+      "mcpConfigPath": "MCP Config Path",
+      "mcpConfigPathPlaceholder": "Path to MCP configuration file",
+      "mcpConfigPathHint": "Where the client reads MCP server configuration",
+      "skillsPath": "Skills Path",
+      "skillsPathPlaceholder": "Path to skills directory",
+      "skillsPathHint": "Where skills should be synced to (~ expands to home)",
+      "create": "Add Client"
+    },
+    "editClient": {
+      "title": "Edit Client",
+      "description": "Update the client configuration"
+    },
+    "deleteConfirm": {
+      "title": "Delete Client",
+      "message": "Are you sure you want to delete this client? This will remove all associated symlinks.",
+      "confirm": "Delete"
+    },
+    "errors": {
+      "loadFailed": "Failed to load client apps",
+      "nameRequired": "Client name is required",
+      "createFailed": "Failed to create client",
+      "updateFailed": "Failed to update client",
+      "configureFailed": "Failed to configure client",
+      "serverAccessFailed": "Failed to update server access",
+      "deleteFailed": "Failed to delete client"
+    }
+  },
+  "marketplace": {
+    "title": "Marketplace",
+    "search": "Search marketplace...",
+    "searchPlaceholder": "Search servers and skills...",
+    "tabs": {
+      "servers": "MCP Servers",
+      "skills": "Skills"
+    },
+    "servers": {
+      "title": "MCP Servers",
+      "addToRouter": "Add to Router",
+      "noResults": "No servers found",
+      "loading": "Loading servers...",
+      "official": "Official",
+      "verified": "Verified"
+    },
+    "skills": {
+      "title": "Skills",
+      "install": "Install",
+      "installed": "Installed",
+      "noResults": "No skills found",
+      "loading": "Loading skills...",
+      "installs": "installs"
     }
   }
 }
